@@ -1,0 +1,35 @@
+=== android/ root ===
+[F] .gitignore
+[D] app
+[F] build.gradle
+[D] capacitor-cordova-android-plugins
+[F] capacitor.settings.gradle
+[D] gradle
+[F] gradle.properties
+[F] gradlew
+[F] gradlew.bat
+[F] settings.gradle
+[F] variables.gradle
+
+=== android/app/ ===
+[F] .gitignore
+[D] build
+[F] build.gradle
+[F] capacitor.build.gradle
+[F] proguard-rules.pro
+[D] src
+
+=== android/app/src/main/ ===
+[F] AndroidManifest.xml
+[D] assets
+[D] java
+[D] res
+
+=== Key file checks ===
+✓ build.gradle
+✓ app/build.gradle
+✓ settings.gradle
+✓ gradle.properties
+✓ gradlew
+✓ gradlew.bat
+✓ app/src/main/AndroidManifest.xml

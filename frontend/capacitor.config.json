@@ -1,0 +1,8 @@
+{
+  "appId": "com.sih2026.ruralhealth",
+  "appName": "RuralHealthPlatform",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
