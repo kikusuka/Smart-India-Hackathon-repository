@@ -43,7 +43,9 @@ export default function useOfflineSync() {
       const result = await postSyncBatch(batch);
 
       if (result && result.success) {
-        const syncedIds = batch.slice(0, result.synced_count || batch.length).map((r) => r.id);
+        const syncedCount =
+          typeof result.synced_count === 'number' ? result.synced_count : batch.length;
+        const syncedIds = batch.slice(0, syncedCount).map((r) => r.id);
         if (syncedIds.length > 0) {
           await clearPendingDiagnoses(syncedIds);
         }
