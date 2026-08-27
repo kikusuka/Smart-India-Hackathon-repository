@@ -1,15 +1,42 @@
 import { deflate, inflate } from 'pako';
 
+const MAX_QR_HISTORY_RECORDS = 8;
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
 export function encodeHistoryToQR(historyArray) {
   if (!Array.isArray(historyArray)) {
     throw new Error('encodeHistoryToQR expects an array of diagnosis records');
   }
   
-  const jsonString = JSON.stringify(historyArray);
+  const historyForQR = historyArray.slice(0, MAX_QR_HISTORY_RECORDS);
+  if (historyForQR.length < historyArray.length) {
+    console.warn(
+      `QR history truncated from ${historyArray.length} to ${MAX_QR_HISTORY_RECORDS} records`
+    );
+  }
+
+  const jsonString = JSON.stringify(historyForQR);
   
-  const compressed = deflate(jsonString, { to: 'string' });
-  
-  const base64 = btoa(compressed);
+  const compressed = deflate(jsonString);
+
+  const base64 = bytesToBase64(compressed);
   
   const urlSafe = base64
     .replace(/\+/g, '-')
@@ -35,14 +62,14 @@ export function decodeQRToHistory(qrString) {
   
   let compressed;
   try {
-    compressed = atob(base64);
+    compressed = base64ToBytes(base64);
   } catch (e) {
     throw new Error('Invalid QR data: failed to decode base64');
   }
   
   let jsonString;
   try {
-    jsonString = inflate(compressed, { to: 'string' });
+    jsonString = new TextDecoder().decode(inflate(compressed));
   } catch (e) {
     throw new Error('Invalid QR data: failed to decompress');
   }

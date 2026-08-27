@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import QRCode from 'qrcode';
 import { encodeHistoryToQR, createDiagnosisRecord, addDiagnosisToHistory } from '../services/localHistory';
 
 const CATEGORIES = ['fever', 'cough', 'injury', 'rash', 'diarrhea', 'other'];
@@ -25,7 +26,7 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [qrCode, setQrCode] = useState(null);
+  const [qrImage, setQrImage] = useState(null);
   const [successMsg, setSuccessMsg] = useState('');
 
   const handleChange = (e) => {
@@ -37,7 +38,7 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setQrCode(null);
+    setQrImage(null);
     setSuccessMsg('');
 
     const newDiagnosis = createDiagnosisRecord(formData);
@@ -45,7 +46,12 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
 
     try {
       const qrData = encodeHistoryToQR(updatedHistory);
-      setQrCode(qrData);
+      const imageDataUrl = await QRCode.toDataURL(qrData, {
+        errorCorrectionLevel: 'L',
+        margin: 2,
+        width: 384,
+      });
+      setQrImage(imageDataUrl);
       setSuccessMsg('Diagnosis added! Patient QR code generated below.');
     } catch (err) {
       setError(err.message || 'Failed to generate QR code');
@@ -53,10 +59,6 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
       setLoading(false);
     }
   };
-
-  const qrSrc = qrCode
-    ? `data:image/png;base64,${qrCode}`
-    : null;
 
   return (
     <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md border border-gray-200">
@@ -82,7 +84,7 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
         </div>
       )}
 
-      {qrSrc && (
+      {qrImage && (
         <div className="mb-8 p-6 bg-blue-50 rounded-lg border border-blue-200 flex flex-col items-center justify-center">
           <h3 className="text-lg font-bold text-blue-900 mb-2">Patient QR Code Generated</h3>
           <p className="text-sm text-blue-700 mb-4 text-center">
@@ -90,11 +92,11 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
             <br />
             <span className="font-semibold text-blue-800">Nothing is sent to any server.</span>
           </p>
-          <img src={qrSrc} alt="Patient QR Code" className="w-48 h-48 bg-white p-2 border border-gray-300 rounded-md shadow-sm" />
+          <img src={qrImage} alt="Patient QR Code" className="w-48 h-48 bg-white p-2 border border-gray-300 rounded-md shadow-sm" />
           <button 
             onClick={() => {
               const link = document.createElement('a');
-              link.href = qrSrc;
+              link.href = qrImage;
               link.download = `patient_qr_${formData.doctor_name || 'record'}.png`;
               link.click();
             }}

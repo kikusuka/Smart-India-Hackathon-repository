@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import QrScanner from 'qr-scanner';
+import QrScannerWorkerPath from 'qr-scanner/qr-scanner-worker.min.js?url';
 import { decodeQRToHistory } from '../services/localHistory';
+
+QrScanner.WORKER_PATH = QrScannerWorkerPath;
 
 export default function QRScanner({ onScanSuccess }) {
   const videoRef = useRef(null);
@@ -10,6 +13,7 @@ export default function QRScanner({ onScanSuccess }) {
   const qrScannerRef = useRef(null);
 
   const startScanner = async () => {
+    if (qrScannerRef.current) return;
     setCameraError(null);
     setScannerActive(true);
     
@@ -20,6 +24,10 @@ export default function QRScanner({ onScanSuccess }) {
           videoRef.current,
           (result) => {
             const qrData = typeof result === 'object' ? result.data : result;
+            console.info('QR scanner detected a code', {
+              length: qrData?.length || 0,
+              preview: qrData?.slice(0, 32),
+            });
             if (qrData) {
               try {
                 const historyArray = decodeQRToHistory(qrData);
@@ -34,11 +42,13 @@ export default function QRScanner({ onScanSuccess }) {
           {
             highlightScanRegion: true,
             highlightCodeOutline: true,
+            returnDetailedScanResult: true,
           }
         );
         
         qrScannerRef.current = qrScanner;
         await qrScanner.start();
+        console.info('QR scanner started and is scanning video frames');
       } catch (err) {
         console.error('QR Scanner init error:', err);
         setCameraError(err.message || 'Could not access camera. Please check permissions.');
