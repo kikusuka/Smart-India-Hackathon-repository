@@ -4,6 +4,7 @@ import DoctorDashboard from './pages/DoctorDashboard'
 import PatientPortal from './pages/PatientPortal'
 import SurveillanceDashboard from './pages/SurveillanceDashboard'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
+import { AuthProvider } from './context/AuthContext'
 
 function ThemeToggle() {
   const { isDark, toggleTheme } = useTheme();
@@ -57,7 +58,9 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </ThemeProvider>
   )
 }

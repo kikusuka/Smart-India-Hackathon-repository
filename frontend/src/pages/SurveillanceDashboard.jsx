@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getOutbreakCheck } from '../services/api';
 
 const mockRegions = [
   {
@@ -46,6 +47,8 @@ const mockNationalStats = {
 
 export default function SurveillanceDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
+  const [outbreakAlerts, setOutbreakAlerts] = useState({});
+  const [outbreakLoading, setOutbreakLoading] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -65,6 +68,27 @@ export default function SurveillanceDashboard() {
       }
     }, 500);
   }, []);
+
+  useEffect(() => {
+    if (!dashboardData?.regions) return;
+    
+    const fetchOutbreakAlerts = async () => {
+      for (const regionItem of dashboardData.regions) {
+        setOutbreakLoading(prev => ({ ...prev, [regionItem.region]: true }));
+        try {
+          const data = await getOutbreakCheck(regionItem.region);
+          setOutbreakAlerts(prev => ({ ...prev, [regionItem.region]: data.alerts || [] }));
+        } catch (err) {
+          console.error(`Failed to fetch outbreak alerts for ${regionItem.region}:`, err);
+          setOutbreakAlerts(prev => ({ ...prev, [regionItem.region]: [] }));
+        } finally {
+          setOutbreakLoading(prev => ({ ...prev, [regionItem.region]: false }));
+        }
+      }
+    };
+    
+    fetchOutbreakAlerts();
+  }, [dashboardData]);
 
   if (loading) {
     return (
@@ -121,16 +145,15 @@ export default function SurveillanceDashboard() {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto py-4 px-2 sm:px-4 transition-colors duration-300">
-      {/* Demo Mode Banner */}
+      {/* Updated Demo Mode Banner */}
       <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-5 flex items-center gap-4 shadow-sm transition-colors">
         <svg className="flex-shrink-0 h-8 w-8 text-amber-600 dark:text-amber-400" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
         </svg>
         <div>
-          <p className="font-bold text-amber-800 dark:text-amber-300 text-lg">Demo Mode — Mock Data</p>
+          <p className="font-bold text-amber-800 dark:text-amber-300 text-lg">Demo Mode — Partial Mock Data</p>
           <p className="text-sm text-amber-700 dark:text-amber-400/80 mt-1">
-            This surveillance dashboard uses hardcoded sample data for demonstration purposes.
-            In production, this would connect to the backend API for real-time regional outbreak data.
+            Outbreak alerts below are live from real data — other statistics shown are demo/sample data.
           </p>
         </div>
       </div>
@@ -163,7 +186,7 @@ export default function SurveillanceDashboard() {
         </div>
       </div>
 
-      {/* Region Cards Grid */}
+      {/* Region Cards Grid with Outbreak Alerts */}
       <div>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white font-casual">Regional Surveillance Status</h2>
@@ -175,44 +198,79 @@ export default function SurveillanceDashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {regions.map((regionItem, idx) => (
-              <div
-                key={idx}
-                className={`p-6 rounded-xl border border-l-8 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 ${getAlertColorClasses(regionItem.alert_level)}`}
-              >
-                <div className="flex justify-between items-start mb-6">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">{regionItem.region}</h3>
-                  <span className={`px-3 py-1.5 rounded-md text-xs font-black uppercase tracking-widest ${getAlertBadgeClasses(regionItem.alert_level)}`}>
-                    {regionItem.alert_level || 'Unknown'}
-                  </span>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="bg-white/50 dark:bg-black/10 p-3 rounded-lg border border-black/5 dark:border-white/5">
-                    <p className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">Total Cases</p>
-                    <p className="text-3xl font-black text-gray-900 dark:text-white">{regionItem.case_count?.toLocaleString() || '0'}</p>
+            {regions.map((regionItem, idx) => {
+              const alerts = outbreakAlerts[regionItem.region] || [];
+              const isLoadingOutbreak = outbreakLoading[regionItem.region];
+              
+              return (
+                <div
+                  key={idx}
+                  className={`p-6 rounded-xl border border-l-8 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 ${getAlertColorClasses(regionItem.alert_level)}`}
+                >
+                  {/* Outbreak Alerts Banner - shown at top of region card if alerts exist */}
+                  {alerts.length > 0 && (
+                    <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 animate-fade-in">
+                      <div className="flex items-start gap-2">
+                        <svg className="flex-shrink-0 mt-0.5 h-5 w-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2a1 1 0 102 0V7zm-1 8a1 1 0 10-2 0 1 1 0 002 0z" clipRule="evenodd" />
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider">Live Outbreak Alert</p>
+                          <div className="mt-1 space-y-1">
+                            {alerts.map((alert, alertIdx) => (
+                              <p key={alertIdx} className="text-sm text-red-700 dark:text-red-300 font-medium">
+                                {alert.case_count} cases of {alert.diagnosis_category} reported in {alert.message?.includes('in ') ? alert.message.split('in ')[1] : alert.region} in the last {alert.window_hours} hours
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {isLoadingOutbreak && alerts.length === 0 && (
+                    <div className="mb-4 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50">
+                      <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300 text-sm">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        Checking for outbreak alerts...
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-start mb-6">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">{regionItem.region}</h3>
+                    <span className={`px-3 py-1.5 rounded-md text-xs font-black uppercase tracking-widest ${getAlertBadgeClasses(regionItem.alert_level)}`}>
+                      {regionItem.alert_level || 'Unknown'}
+                    </span>
                   </div>
                   
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Top Diagnoses</p>
-                    {regionItem.top_diagnoses && regionItem.top_diagnoses.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {regionItem.top_diagnoses.map((diagnosis, diagIdx) => (
-                          <span
-                            key={diagIdx}
-                            className="px-2.5 py-1.5 bg-white dark:bg-slate-800 rounded-md text-xs font-bold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-600 shadow-sm capitalize"
-                          >
-                            {diagnosis}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-400 dark:text-gray-500 italic font-medium">No data</p>
-                    )}
+                  <div className="space-y-4">
+                    <div className="bg-white/50 dark:bg-black/10 p-3 rounded-lg border border-black/5 dark:border-white/5">
+                      <p className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">Total Cases</p>
+                      <p className="text-3xl font-black text-gray-900 dark:text-white">{regionItem.case_count?.toLocaleString() || '0'}</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Top Diagnoses</p>
+                      {regionItem.top_diagnoses && regionItem.top_diagnoses.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {regionItem.top_diagnoses.map((diagnosis, diagIdx) => (
+                            <span
+                              key={diagIdx}
+                              className="px-2.5 py-1.5 bg-white dark:bg-slate-800 rounded-md text-xs font-bold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-600 shadow-sm capitalize"
+                            >
+                              {diagnosis}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-400 dark:text-gray-500 italic font-medium">No data</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

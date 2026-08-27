@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { confirmDiagnosis } from '../services/api';
 
 export default function MedicalTimeline({ patientData }) {
   if (!patientData) return null;
 
   const { patient_qr_id, medical_history = [], annotations = [], progression_alerts = [] } = patientData;
 
-  // Sort medical history chronologically (latest first or earliest first? Usually latest first makes reading easier, but let's sort latest first)
+  // Sort medical history chronologically (latest first)
   const sortedHistory = [...medical_history].sort((a, b) => {
     return new Date(b.diagnosis_date) - new Date(a.diagnosis_date);
   });
@@ -25,8 +26,42 @@ export default function MedicalTimeline({ patientData }) {
     }
   };
 
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleConfirm = async (entryId) => {
+    try {
+      await confirmDiagnosis(entryId);
+      showToast('Diagnosis confirmed as accurate ✓');
+    } catch (err) {
+      showToast(err.message || 'Failed to confirm diagnosis', 'error');
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-4xl mx-auto transition-colors duration-300">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 animate-slide-in px-4 py-3 rounded-lg shadow-lg border flex items-center gap-3 ${
+          toast.type === 'success' 
+            ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50'
+            : 'bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/50'
+        }`}>
+          <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            {toast.type === 'success' ? (
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            ) : (
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            )}
+          </svg>
+          <span className="text-sm font-medium">{toast.message}</span>
+        </div>
+      )}
+
       {/* Patient Identification Card */}
       <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex items-center justify-between">
         <div>
@@ -105,9 +140,24 @@ export default function MedicalTimeline({ patientData }) {
                         Diagnosed by: <span className="font-bold">{item.doctor_name}</span>
                       </div>
                     </div>
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-gray-200 dark:border-slate-600 shadow-sm">
-                      {formatDate(item.diagnosis_date)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-gray-200 dark:border-slate-600 shadow-sm">
+                        {formatDate(item.diagnosis_date)}
+                      </span>
+                      {/* Confirm Accurate Button - only show if item has an ID */}
+                      {item.id && (
+                        <button
+                          onClick={() => handleConfirm(item.id)}
+                          className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/50 transition-colors"
+                          title="Confirm diagnosis as accurate"
+                          aria-label="Confirm diagnosis as accurate"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
