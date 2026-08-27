@@ -1,10 +1,16 @@
 const BASE_URL = import.meta.env.VITE_API_URL || '';
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('rhp-doctor-token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 async function request(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;
   const config = {
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...options.headers,
     },
     ...options,
@@ -54,12 +60,37 @@ export async function postSyncBatch(batch) {
   });
 }
 
+export async function signupDoctor(payload) {
+  return request('/api/auth/doctor/signup', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function loginDoctor(payload) {
+  const result = await request('/api/auth/doctor/login', { method: 'POST', body: JSON.stringify(payload) });
+  if (result.access_token) localStorage.setItem('rhp-doctor-token', result.access_token);
+  return result;
+}
+
+export async function pullPatientDelta(patientQrId, sinceSequence = 0) {
+  return request('/api/sync/pull', {
+    method: 'POST',
+    body: JSON.stringify({ patient_qr_id: patientQrId, since_sequence: sinceSequence }),
+  });
+}
+
+export async function pushDiagnosisEntry(payload) {
+  return request('/api/sync/push', { method: 'POST', body: JSON.stringify(payload) });
+}
+
 export const api = {
   postDiagnosis,
   getPatient,
   getSurveillance,
   getSurveillanceDashboard,
   postSyncBatch,
+  signupDoctor,
+  loginDoctor,
+  pullPatientDelta,
+  pushDiagnosisEntry,
 };
 
 export default api;
