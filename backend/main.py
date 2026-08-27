@@ -1,4 +1,5 @@
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -175,6 +176,13 @@ def parse_dt(value: str) -> datetime:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+def parse_request_dt(value: str, field_name: str) -> datetime:
+    try:
+        return parse_dt(value)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail=f"{field_name} must be a valid ISO 8601 datetime")
+
+
 def make_qr_base64(patient_qr_id: str) -> str:
     if qrcode is None:
         return base64.b64encode(patient_qr_id.encode("utf-8")).decode("utf-8")
@@ -232,7 +240,7 @@ def require_doctor(credentials: HTTPAuthorizationCredentials | None = Depends(be
         if int(payload["exp"]) <= int(datetime.now(timezone.utc).timestamp()):
             raise ValueError("expired")
         doctor_id = str(payload["doctor_id"])
-    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+    except (ValueError, KeyError, TypeError, binascii.Error, json.JSONDecodeError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired session")
     if not fetch_one("SELECT doctor_id FROM doctors WHERE doctor_id = %s", (doctor_id,)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Doctor session is no longer valid")
@@ -317,7 +325,7 @@ def sync_pull(payload: SyncPullRequest, doctor_id: str = Depends(require_doctor)
 @app.post("/api/sync/push")
 def sync_push(payload: SyncPushRequest, doctor_id: str = Depends(require_doctor)):
     doctor = fetch_one("SELECT doctor_name FROM doctors WHERE doctor_id = %s", (doctor_id,))
-    created_at = parse_dt(payload.created_at) if payload.created_at else datetime.now(timezone.utc)
+    created_at = parse_request_dt(payload.created_at, "created_at") if payload.created_at else datetime.now(timezone.utc)
     with get_connection() as conn:
         with conn.cursor() as cur:
             entry_id, sequence_number, inserted = insert_sequence_entry(cur, payload.patient_qr_id, doctor_id, doctor[0], payload.diagnosis_category, payload.diagnosis_text, payload.treatment_text, payload.medicine, payload.dosage, payload.region, created_at, payload.client_entry_id)
@@ -327,17 +335,17 @@ def sync_push(payload: SyncPushRequest, doctor_id: str = Depends(require_doctor)
 
 
 @app.post("/api/diagnosis/{entry_id}/confirm")
-def confirm_diagnosis(entry_id: str, confirming_doctor_id: str = Depends(require_doctor)):
+def confirm_diagnosis(entry_id: uuid.UUID, confirming_doctor_id: str = Depends(require_doctor)):
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""SELECT doctor_id, confirmed_at FROM diagnosis_entries
-                WHERE id = %s FOR UPDATE""", (entry_id,))
+                WHERE id = %s FOR UPDATE""", (str(entry_id),))
             entry = cur.fetchone()
             if not entry:
                 raise HTTPException(status_code=404, detail="Diagnosis entry not found")
             if entry[1] is None:
                 cur.execute("""UPDATE diagnosis_entries
-                    SET confirmed_at = NOW(), confirmed_by = %s WHERE id = %s""", (confirming_doctor_id, entry_id))
+                    SET confirmed_at = NOW(), confirmed_by = %s WHERE id = %s""", (confirming_doctor_id, str(entry_id)))
                 cur.execute("""UPDATE doctor_stats SET
                     confirmed_accurate = confirmed_accurate + 1,
                     accuracy_score = (confirmed_accurate + 1)::DOUBLE PRECISION /
@@ -345,7 +353,7 @@ def confirm_diagnosis(entry_id: str, confirming_doctor_id: str = Depends(require
                     WHERE doctor_id = %s""", (entry[0],))
             cur.execute("SELECT accuracy_score FROM doctor_stats WHERE doctor_id = %s", (entry[0],))
             score = cur.fetchone()
-    return {"success": True, "entry_id": entry_id, "confirmed_accurate": True, "accuracy_score": score[0] if score else None}
+    return {"success": True, "entry_id": str(entry_id), "confirmed_accurate": True, "accuracy_score": score[0] if score else None}
 
 
 @app.get("/api/doctor/{doctor_id}/stats")
@@ -365,7 +373,7 @@ def get_doctor_stats(doctor_id: str, current_doctor_id: str = Depends(require_do
 def create_diagnosis(payload: DiagnosisRequest):
     patient_qr_id = str(uuid.uuid4())
     diagnosis_id = str(uuid.uuid4())
-    diagnosis_dt = parse_dt(payload.diagnosis_date)
+    diagnosis_dt = parse_request_dt(payload.diagnosis_date, "diagnosis_date")
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO diagnoses

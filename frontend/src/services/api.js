@@ -35,19 +35,6 @@ async function request(endpoint, options = {}) {
   return response.json();
 }
 
-export async function postDiagnosis(payload) {
-  return request('/api/diagnosis', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function getPatient(qrId) {
-  return request(`/api/patient/${encodeURIComponent(qrId)}`, {
-    method: 'GET',
-  });
-}
-
 export async function getSurveillance(region) {
   return request(`/api/surveillance/${encodeURIComponent(region)}`, {
     method: 'GET',
@@ -101,8 +88,6 @@ export async function getOutbreakCheck(region) {
 }
 
 export const api = {
-  postDiagnosis,
-  getPatient,
   getSurveillance,
   getSurveillanceDashboard,
   postSyncBatch,

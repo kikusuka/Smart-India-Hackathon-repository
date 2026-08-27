@@ -10,12 +10,9 @@ export default function PatientPortal() {
   const handleScanSuccess = (historyArray) => {
     setError(null);
     try {
-      const patient_qr_id = historyArray.length > 0 
-        ? `patient_${historyArray[0].doctor_name?.replace(/\s+/g, '_') || 'record'}_${Date.now()}`
-        : 'unknown_patient';
-      
       setPatientData({
-        patient_qr_id,
+        patient_qr_id: null,
+        is_offline_qr: true,
         medical_history: historyArray,
         annotations: [],
         progression_alerts: []
@@ -71,7 +68,7 @@ export default function PatientPortal() {
           <div className="space-y-6 animate-fade-in-up">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 transition-colors gap-4">
               <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
-                Viewing Record: <span className="font-mono text-emerald-700 dark:text-emerald-400 ml-1 py-0.5 px-2 bg-emerald-50 dark:bg-slate-700 rounded-md border border-emerald-100 dark:border-slate-600">{patientData.patient_qr_id}</span>
+                Viewing Record: <span className="font-mono text-emerald-700 dark:text-emerald-400 ml-1 py-0.5 px-2 bg-emerald-50 dark:bg-slate-700 rounded-md border border-emerald-100 dark:border-slate-600">{patientData.is_offline_qr ? 'Offline QR record' : patientData.patient_qr_id}</span>
               </span>
               <button
                 onClick={handleReset}

@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { confirmDiagnosis } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function MedicalTimeline({ patientData }) {
+  const { isAuthenticated } = useAuth();
+  const [toast, setToast] = useState(null);
   if (!patientData) return null;
 
   const { patient_qr_id, medical_history = [], annotations = [], progression_alerts = [] } = patientData;
@@ -26,8 +29,6 @@ export default function MedicalTimeline({ patientData }) {
     }
   };
 
-  const [toast, setToast] = useState(null);
-
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -36,7 +37,7 @@ export default function MedicalTimeline({ patientData }) {
   const handleConfirm = async (entryId) => {
     try {
       await confirmDiagnosis(entryId);
-      showToast('Diagnosis confirmed as accurate ✓');
+      showToast('Diagnosis confirmation recorded');
     } catch (err) {
       showToast(err.message || 'Failed to confirm diagnosis', 'error');
     }
@@ -145,7 +146,7 @@ export default function MedicalTimeline({ patientData }) {
                         {formatDate(item.diagnosis_date)}
                       </span>
                       {/* Confirm Accurate Button - only show if item has an ID */}
-                      {item.id && (
+                      {item.id && isAuthenticated && (
                         <button
                           onClick={() => handleConfirm(item.id)}
                           className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/50 transition-colors"

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import QRCode from 'qrcode';
 import InfoTooltip from './InfoTooltip';
+import { useAuth } from '../context/AuthContext';
 import { encodeHistoryToQR, createDiagnosisRecord, addDiagnosisToHistory } from '../services/localHistory';
 
 const CATEGORIES = ['fever', 'cough', 'injury', 'rash', 'diarrhea', 'other'];
@@ -13,9 +14,8 @@ const LANGUAGES = [
 ];
 
 export default function DiagnosisForm({ isOnline = true, existingHistory = [] }) {
+  const { doctorId, doctorName } = useAuth();
   const [formData, setFormData] = useState({
-    doctor_name: '',
-    doctor_id: '',
     diagnosis_text: '',
     diagnosis_category: 'fever',
     treatment_text: '',
@@ -42,7 +42,11 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
     setQrImage(null);
     setSuccessMsg('');
 
-    const newDiagnosis = createDiagnosisRecord(formData);
+    const newDiagnosis = createDiagnosisRecord({
+      ...formData,
+      doctor_id: doctorId,
+      doctor_name: doctorName || doctorId,
+    });
     const updatedHistory = addDiagnosisToHistory(existingHistory, newDiagnosis);
 
     try {
@@ -101,7 +105,7 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
             onClick={() => {
               const link = document.createElement('a');
               link.href = qrImage;
-              link.download = `patient_qr_${formData.doctor_name || 'record'}.png`;
+              link.download = `patient_qr_${doctorName || doctorId || 'record'}.png`;
               link.click();
             }}
             className="mt-6 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm hover:shadow transition-all font-medium flex items-center gap-2"
@@ -121,29 +125,13 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
             Provider Details
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase">Doctor Name</label>
-              <input
-                type="text"
-                name="doctor_name"
-                value={formData.doctor_name}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
-                placeholder="Dr. Rajesh Kumar"
-              />
+            <div className="rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3">
+              <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Doctor Name</p>
+              <p className="mt-1 font-semibold text-gray-900 dark:text-white">{doctorName || 'Authenticated doctor'}</p>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase">Doctor ID</label>
-              <input
-                type="text"
-                name="doctor_id"
-                value={formData.doctor_id}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
-                placeholder="DOC-9981"
-              />
+            <div className="rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3">
+              <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">Doctor ID</p>
+              <p className="mt-1 font-mono font-semibold text-gray-900 dark:text-white">{doctorId}</p>
             </div>
           </div>
         </section>
