@@ -81,6 +81,18 @@ export async function pushDiagnosisEntry(payload) {
   return request('/api/sync/push', { method: 'POST', body: JSON.stringify(payload) });
 }
 
+export async function confirmDiagnosis(entryId) {
+  return request(`/api/diagnosis/${encodeURIComponent(entryId)}/confirm`, { method: 'POST' });
+}
+
+export async function getDoctorStats(doctorId) {
+  return request(`/api/doctor/${encodeURIComponent(doctorId)}/stats`, { method: 'GET' });
+}
+
+export async function getOutbreakCheck(region) {
+  return request(`/api/surveillance/outbreak-check/${encodeURIComponent(region)}`, { method: 'GET' });
+}
+
 export const api = {
   postDiagnosis,
   getPatient,
@@ -91,6 +103,9 @@ export const api = {
   loginDoctor,
   pullPatientDelta,
   pushDiagnosisEntry,
+  confirmDiagnosis,
+  getDoctorStats,
+  getOutbreakCheck,
 };
 
 export default api;
