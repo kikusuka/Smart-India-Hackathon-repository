@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getOutbreakCheck } from '../services/api';
 import InfoTooltip from '../components/InfoTooltip';
+import { getAggregateRecords, mergeNearbyPeerData, simulateNearbyPeer } from '../services/nearbySync';
 
 const mockRegions = [
   {
@@ -52,6 +53,32 @@ export default function SurveillanceDashboard() {
   const [outbreakLoading, setOutbreakLoading] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [nearbyRecords, setNearbyRecords] = useState([]);
+  const [nearbyStatus, setNearbyStatus] = useState('idle');
+  const [nearbyPeer, setNearbyPeer] = useState(null);
+  const [nearbyChangedCount, setNearbyChangedCount] = useState(0);
+
+  useEffect(() => {
+    getAggregateRecords().then(setNearbyRecords).catch((err) => {
+      console.error('Failed to load nearby aggregate records:', err);
+    });
+  }, []);
+
+  const handleNearbySync = async () => {
+    if (!['idle', 'done'].includes(nearbyStatus)) return;
+
+    setNearbyStatus('scanning');
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    const peer = await simulateNearbyPeer();
+    setNearbyPeer(peer);
+    setNearbyStatus('device-found');
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    setNearbyStatus('syncing');
+    const result = await mergeNearbyPeerData(peer.records);
+    setNearbyRecords(result.records);
+    setNearbyChangedCount(result.changedRecords.length);
+    setNearbyStatus('done');
+  };
 
   useEffect(() => {
     setTimeout(() => {
@@ -117,6 +144,8 @@ export default function SurveillanceDashboard() {
   }
 
   const { regions = [], national_stats = {} } = dashboardData;
+  const nearbySignalCount = nearbyRecords.length;
+  const nearbyAlertCount = nearbyRecords.filter((record) => record.count > 5).length;
 
   const getAlertColorClasses = (alertLevel) => {
     switch (alertLevel?.toLowerCase()) {
@@ -159,13 +188,51 @@ export default function SurveillanceDashboard() {
         </div>
       </div>
 
+      <section className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5 shadow-sm dark:border-cyan-800/50 dark:bg-cyan-950/20">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-bold text-cyan-950 dark:text-cyan-100">
+              Offline Health Intelligence Network
+              <InfoTooltip label="Explain nearby sync">This exchanges anonymized outbreak counts between nearby phones running this app — no internet needed, no patient data ever shared, just aggregate counts.</InfoTooltip>
+            </h2>
+            <p className="mt-1 text-sm text-cyan-800 dark:text-cyan-200/80">
+              Share aggregate regional signals with nearby devices when connectivity is unavailable.
+            </p>
+            {nearbyPeer && (
+              <p className="mt-2 text-xs font-semibold text-cyan-700 dark:text-cyan-300">
+                {nearbyChangedCount} aggregate signal{nearbyChangedCount === 1 ? '' : 's'} merged from {nearbyPeer.device_name}.
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleNearbySync}
+            disabled={!['idle', 'done'].includes(nearbyStatus)}
+            className="shrink-0 rounded-xl bg-cyan-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-cyan-800 disabled:cursor-wait disabled:opacity-70 dark:bg-cyan-600 dark:hover:bg-cyan-500"
+          >
+            {nearbyStatus === 'idle' && 'Nearby Sync'}
+            {nearbyStatus === 'scanning' && 'Scanning...'}
+            {nearbyStatus === 'device-found' && 'Device found'}
+            {nearbyStatus === 'syncing' && 'Syncing...'}
+            {nearbyStatus === 'done' && 'Sync complete'}
+          </button>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wider text-cyan-800 dark:text-cyan-200">
+          {['idle', 'scanning', 'device-found', 'syncing', 'done'].map((status) => (
+            <span key={status} className={`rounded-full px-3 py-1 ${nearbyStatus === status ? 'bg-cyan-700 text-white dark:bg-cyan-500' : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300'}`}>
+              {status === 'device-found' ? 'device found' : status}
+            </span>
+          ))}
+        </div>
+      </section>
+
       {/* National Statistics Header */}
       <div className="bg-gradient-to-r from-blue-700 to-blue-900 dark:from-slate-800 dark:to-slate-900 text-white p-8 rounded-2xl shadow-lg border border-blue-600 dark:border-slate-700 transition-colors">
         <h1 className="text-3xl font-extrabold mb-6 font-casual flex items-center gap-3">
           <svg className="w-8 h-8 text-blue-300 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
           National Health Surveillance
         </h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white/10 dark:bg-black/20 backdrop-blur-md p-6 rounded-xl border border-white/10">
             <p className="text-blue-100 dark:text-slate-300 text-xs uppercase tracking-widest font-bold mb-2 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
@@ -183,6 +250,11 @@ export default function SurveillanceDashboard() {
             }`}>
               {national_stats.outbreak_alerts?.toLocaleString() || '0'}
             </p>
+          </div>
+          <div className="bg-white/10 dark:bg-black/20 backdrop-blur-md p-6 rounded-xl border border-white/10">
+            <p className="text-blue-100 dark:text-slate-300 text-xs uppercase tracking-widest font-bold mb-2">Nearby Signals</p>
+            <p className="text-5xl font-black text-cyan-200 dark:text-cyan-300">{nearbySignalCount.toLocaleString()}</p>
+            <p className="mt-2 text-xs text-blue-100 dark:text-slate-300">{nearbyAlertCount} above alert threshold</p>
           </div>
         </div>
       </div>
@@ -202,6 +274,7 @@ export default function SurveillanceDashboard() {
             {regions.map((regionItem, idx) => {
               const alerts = outbreakAlerts[regionItem.region] || [];
               const isLoadingOutbreak = outbreakLoading[regionItem.region];
+              const regionNearbyRecords = nearbyRecords.filter((record) => record.region === regionItem.region);
               
               return (
                 <div
@@ -277,6 +350,22 @@ export default function SurveillanceDashboard() {
                         <p className="text-sm text-gray-400 dark:text-gray-500 italic font-medium">No data</p>
                       )}
                     </div>
+                    {regionNearbyRecords.length > 0 && (
+                      <div className="rounded-lg border border-cyan-200 bg-cyan-50/70 p-3 dark:border-cyan-800/50 dark:bg-cyan-950/20">
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-xs font-bold uppercase tracking-widest text-cyan-700 dark:text-cyan-300">Nearby Sync</p>
+                          <span className="text-xs font-bold text-cyan-700 dark:text-cyan-300">{regionNearbyRecords.length} signal{regionNearbyRecords.length === 1 ? '' : 's'}</span>
+                        </div>
+                        <div className="space-y-1 text-sm text-cyan-900 dark:text-cyan-100">
+                          {regionNearbyRecords.map((record) => (
+                            <div key={record.record_id} className="flex items-center justify-between gap-3">
+                              <span className="capitalize">{record.diagnosis_category} · {record.date_bucket}</span>
+                              <span className="font-black">{record.count} cases</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
