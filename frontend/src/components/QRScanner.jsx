@@ -86,66 +86,75 @@ export default function QRScanner({ onScanSuccess }) {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200 max-w-md mx-auto">
-      <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">Scan Patient QR Code</h3>
+    <div className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 max-w-lg mx-auto transition-colors duration-300">
+      <div className="flex flex-col items-center mb-6">
+        <div className="bg-emerald-100 dark:bg-emerald-900/30 p-3 rounded-full mb-4">
+          <svg className="w-8 h-8 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0a8 8 0 11-16 0 8 8 0 0116 0z"></path></svg>
+        </div>
+        <h3 className="text-2xl font-bold text-gray-800 dark:text-white text-center font-casual">Scan Patient QR</h3>
+      </div>
       
       {cameraError && (
-        <div className="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm border border-red-200">
-          {cameraError}
+        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm border border-red-200 dark:border-red-800 flex items-start gap-3">
+          <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+          <span>{cameraError}</span>
         </div>
       )}
 
-      <div className="relative aspect-video w-full bg-black rounded-lg overflow-hidden mb-4 flex items-center justify-center border border-gray-300">
+      <div className="relative aspect-video w-full bg-slate-100 dark:bg-slate-900 rounded-xl overflow-hidden mb-6 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-slate-600 transition-colors">
         {scannerActive ? (
           <video ref={videoRef} className="w-full h-full object-cover"></video>
         ) : (
-          <div className="text-center p-4">
-            <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0a8 8 0 11-16 0 8 8 0 0116 0z" />
+          <div className="text-center p-6 flex flex-col items-center">
+            <svg className="h-10 w-10 text-gray-400 dark:text-gray-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <p className="text-sm text-gray-500">Camera is off</p>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Camera is off</p>
           </div>
         )}
       </div>
 
-      <div className="flex gap-2 justify-center mb-6">
+      <div className="flex justify-center mb-8">
         {!scannerActive ? (
           <button
             onClick={startScanner}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded shadow transition"
+            className="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2"
           >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
             Start Camera Scanner
           </button>
         ) : (
           <button
             onClick={stopScanner}
-            className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded shadow transition"
+            className="w-full py-3.5 px-6 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2"
           >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>
             Stop Scanner
           </button>
         )}
       </div>
 
-      <div className="border-t border-gray-200 pt-4">
-        <form onSubmit={handleManualSubmit} className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Or paste QR data string manually (fallback)
+      <div className="border-t border-gray-100 dark:border-slate-700 pt-6">
+        <form onSubmit={handleManualSubmit} className="flex flex-col gap-3">
+          <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Or paste QR data string manually
           </label>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <textarea
-              placeholder="Paste the QR code data string here..."
+              placeholder="Paste the raw QR code text here..."
               value={manualData}
               onChange={(e) => setManualData(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-h-[60px] resize-y"
+              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors text-sm min-h-[80px] resize-y font-mono"
             />
             <button
               type="submit"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded text-sm shadow transition"
+              className="w-full py-3 px-6 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-lg shadow transition-all"
             >
               Decode & View History
             </button>
           </div>
-          <p className="text-xs text-gray-400 italic">
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 italic text-center">
             Manual UUID/ID entry no longer works in offline mode — QR data is self-contained.
           </p>
         </form>
