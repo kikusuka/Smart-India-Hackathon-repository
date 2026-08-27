@@ -11,7 +11,7 @@ from typing import Any
 
 import bcrypt
 import psycopg2
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
@@ -27,6 +27,8 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 SESSION_SECRET = os.getenv("SESSION_SECRET") or secrets.token_urlsafe(32)
 SESSION_TTL = timedelta(days=7)
 bearer_scheme = HTTPBearer(auto_error=False)
+OUTBREAK_WINDOW_HOURS = 72
+OUTBREAK_THRESHOLD = 5
 
 app = FastAPI(title="Rural Health Platform API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -111,15 +113,16 @@ def init_db() -> None:
             cases_7_days INTEGER NOT NULL DEFAULT 0, cases_30_days INTEGER NOT NULL DEFAULT 0,
             trend TEXT NOT NULL, trend_percentage TEXT NOT NULL, alert TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
-        """CREATE TABLE IF NOT EXISTS doctor_stats (
-            doctor_id TEXT PRIMARY KEY, doctor_name TEXT NOT NULL,
-            total_diagnoses INTEGER NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
         """CREATE TABLE IF NOT EXISTS progression_patterns (
             pattern_key TEXT PRIMARY KEY, display_name TEXT NOT NULL, alert TEXT NOT NULL,
             risk_level TEXT NOT NULL, predicted_outcome TEXT NOT NULL, recommended_action TEXT NOT NULL)""",
         """CREATE TABLE IF NOT EXISTS doctors (
             id BIGSERIAL PRIMARY KEY, doctor_id TEXT NOT NULL UNIQUE, doctor_name TEXT NOT NULL,
             password_hash TEXT NOT NULL, region TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
+        """CREATE TABLE IF NOT EXISTS doctor_stats (
+            doctor_id TEXT PRIMARY KEY REFERENCES doctors(doctor_id), doctor_name TEXT NOT NULL,
+            total_diagnoses INTEGER NOT NULL DEFAULT 0, confirmed_accurate INTEGER NOT NULL DEFAULT 0,
+            accuracy_score DOUBLE PRECISION, last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
         """CREATE TABLE IF NOT EXISTS patients (
             id BIGSERIAL PRIMARY KEY, patient_qr_id TEXT NOT NULL UNIQUE,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""",
@@ -129,6 +132,7 @@ def init_db() -> None:
             diagnosis_category TEXT NOT NULL, diagnosis_text TEXT NOT NULL, treatment_text TEXT NOT NULL,
             medicine TEXT NOT NULL DEFAULT '', dosage TEXT NOT NULL DEFAULT '', region TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), client_entry_id TEXT UNIQUE,
+            confirmed_at TIMESTAMPTZ, confirmed_by TEXT,
             UNIQUE (patient_qr_id, sequence_number))""",
     ]
     seeds = [
@@ -140,6 +144,13 @@ def init_db() -> None:
         with conn.cursor() as cur:
             for statement in statements:
                 cur.execute(statement)
+            cur.execute("ALTER TABLE doctor_stats ADD COLUMN IF NOT EXISTS confirmed_accurate INTEGER NOT NULL DEFAULT 0")
+            cur.execute("ALTER TABLE doctor_stats ADD COLUMN IF NOT EXISTS accuracy_score DOUBLE PRECISION")
+            cur.execute("ALTER TABLE doctor_stats ADD COLUMN IF NOT EXISTS last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()")
+            cur.execute("ALTER TABLE diagnosis_entries ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ")
+            cur.execute("ALTER TABLE diagnosis_entries ADD COLUMN IF NOT EXISTS confirmed_by TEXT")
+            cur.execute("""UPDATE doctor_stats SET accuracy_score =
+                confirmed_accurate::DOUBLE PRECISION / NULLIF(total_diagnoses, 0)""")
             for row in seeds:
                 cur.execute("""INSERT INTO progression_patterns
                     (pattern_key, display_name, alert, risk_level, predicted_outcome, recommended_action)
@@ -227,7 +238,7 @@ def insert_sequence_entry(cur, patient_qr_id: str, doctor_id: str, doctor_name: 
         cur.execute("SELECT id, sequence_number FROM diagnosis_entries WHERE client_entry_id = %s", (client_entry_id,))
         existing = cur.fetchone()
         if existing:
-            return existing
+            return existing[0], existing[1], False
     cur.execute("SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM diagnosis_entries WHERE patient_qr_id = %s", (patient_qr_id,))
     sequence_number = cur.fetchone()[0]
     entry_id = str(uuid.uuid4())
@@ -236,7 +247,22 @@ def insert_sequence_entry(cur, patient_qr_id: str, doctor_id: str, doctor_name: 
          diagnosis_text, treatment_text, medicine, dosage, region, created_at, client_entry_id)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
         (entry_id, patient_qr_id, sequence_number, doctor_id, doctor_name, category, diagnosis_text, treatment_text, medicine, dosage, region, created_at, client_entry_id))
-    return entry_id, sequence_number
+    return entry_id, sequence_number, True
+
+
+def increment_doctor_diagnoses(cur, doctor_id: str, doctor_name: str):
+    cur.execute(
+        """INSERT INTO doctor_stats
+            (doctor_id, doctor_name, total_diagnoses, confirmed_accurate, accuracy_score, last_updated)
+            VALUES (%s, %s, 1, 0, 0, NOW())
+            ON CONFLICT (doctor_id) DO UPDATE SET
+                doctor_name = EXCLUDED.doctor_name,
+                total_diagnoses = doctor_stats.total_diagnoses + 1,
+                accuracy_score = doctor_stats.confirmed_accurate::DOUBLE PRECISION /
+                    NULLIF(doctor_stats.total_diagnoses + 1, 0),
+                last_updated = NOW()""",
+        (doctor_id, doctor_name),
+    )
 
 
 @app.on_event("startup")
@@ -286,8 +312,45 @@ def sync_push(payload: SyncPushRequest, doctor_id: str = Depends(require_doctor)
     created_at = parse_dt(payload.created_at) if payload.created_at else datetime.now(timezone.utc)
     with get_connection() as conn:
         with conn.cursor() as cur:
-            entry_id, sequence_number = insert_sequence_entry(cur, payload.patient_qr_id, doctor_id, doctor[0], payload.diagnosis_category, payload.diagnosis_text, payload.treatment_text, payload.medicine, payload.dosage, payload.region, created_at, payload.client_entry_id)
+            entry_id, sequence_number, inserted = insert_sequence_entry(cur, payload.patient_qr_id, doctor_id, doctor[0], payload.diagnosis_category, payload.diagnosis_text, payload.treatment_text, payload.medicine, payload.dosage, payload.region, created_at, payload.client_entry_id)
+            if inserted:
+                increment_doctor_diagnoses(cur, doctor_id, doctor[0])
     return {"success": True, "patient_qr_id": payload.patient_qr_id, "entry_id": str(entry_id), "sequence_number": int(sequence_number)}
+
+
+@app.post("/api/diagnosis/{entry_id}/confirm")
+def confirm_diagnosis(entry_id: str, confirming_doctor_id: str = Depends(require_doctor)):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT doctor_id, confirmed_at FROM diagnosis_entries
+                WHERE id = %s FOR UPDATE""", (entry_id,))
+            entry = cur.fetchone()
+            if not entry:
+                raise HTTPException(status_code=404, detail="Diagnosis entry not found")
+            if entry[1] is None:
+                cur.execute("""UPDATE diagnosis_entries
+                    SET confirmed_at = NOW(), confirmed_by = %s WHERE id = %s""", (confirming_doctor_id, entry_id))
+                cur.execute("""UPDATE doctor_stats SET
+                    confirmed_accurate = confirmed_accurate + 1,
+                    accuracy_score = (confirmed_accurate + 1)::DOUBLE PRECISION /
+                        NULLIF(total_diagnoses, 0), last_updated = NOW()
+                    WHERE doctor_id = %s""", (entry[0],))
+            cur.execute("SELECT accuracy_score FROM doctor_stats WHERE doctor_id = %s", (entry[0],))
+            score = cur.fetchone()
+    return {"success": True, "entry_id": entry_id, "confirmed_accurate": True, "accuracy_score": score[0] if score else None}
+
+
+@app.get("/api/doctor/{doctor_id}/stats")
+def get_doctor_stats(doctor_id: str, current_doctor_id: str = Depends(require_doctor)):
+    if current_doctor_id != doctor_id:
+        raise HTTPException(status_code=403, detail="Doctors can only view their own statistics")
+    row = fetch_one("""SELECT d.doctor_id, d.doctor_name, COALESCE(s.total_diagnoses, 0),
+        COALESCE(s.confirmed_accurate, 0), s.accuracy_score
+        FROM doctors d LEFT JOIN doctor_stats s ON s.doctor_id = d.doctor_id
+        WHERE d.doctor_id = %s""", (doctor_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    return {"doctor_id": row[0], "doctor_name": row[1], "total_diagnoses": row[2], "confirmed_accurate": row[3], "accuracy_score": row[4]}
 
 
 @app.post("/api/diagnosis")
@@ -303,9 +366,7 @@ def create_diagnosis(payload: DiagnosisRequest):
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (diagnosis_id, patient_qr_id, payload.doctor_name, payload.doctor_id, payload.diagnosis_text, payload.diagnosis_category, payload.treatment_text, payload.medicine_prescribed, payload.dosage, diagnosis_dt, payload.region, payload.language))
             insert_sequence_entry(cur, patient_qr_id, payload.doctor_id, payload.doctor_name, payload.diagnosis_category, payload.diagnosis_text, payload.treatment_text, payload.medicine_prescribed, payload.dosage, payload.region, diagnosis_dt, diagnosis_id)
-            cur.execute("""INSERT INTO doctor_stats (doctor_id, doctor_name, total_diagnoses, updated_at)
-                VALUES (%s, %s, 1, NOW()) ON CONFLICT (doctor_id) DO UPDATE SET
-                doctor_name = EXCLUDED.doctor_name, total_diagnoses = doctor_stats.total_diagnoses + 1, updated_at = NOW()""", (payload.doctor_id, payload.doctor_name))
+            increment_doctor_diagnoses(cur, payload.doctor_id, payload.doctor_name)
     return {"success": True, "qr_data": {"patient_qr_id": patient_qr_id, "qr_code_base64": make_qr_base64(patient_qr_id)}}
 
 
@@ -330,6 +391,27 @@ def get_surveillance_dashboard():
         regions.append({"region": region, "case_count": int(case_count), "top_diagnoses": [row[0] for row in top_diagnoses], "alert_level": "red" if case_count >= 10 else "yellow" if case_count >= 3 else "green"})
     total_diagnoses = fetch_one("SELECT COUNT(*) FROM diagnoses")[0]
     return {"regions": regions, "national_stats": {"total_diagnoses": int(total_diagnoses), "outbreak_alerts": sum(1 for region in regions if region["alert_level"] == "red")}}
+
+
+@app.get("/api/surveillance/outbreak-check/{region}")
+def outbreak_check(region: str, threshold: int = Query(default=OUTBREAK_THRESHOLD, ge=1)):
+    rows = fetch_all("""SELECT diagnosis_category, COUNT(*) AS case_count
+        FROM diagnosis_entries
+        WHERE region = %s AND created_at >= NOW() - (%s * INTERVAL '1 hour')
+        GROUP BY diagnosis_category HAVING COUNT(*) > %s
+        ORDER BY case_count DESC, diagnosis_category ASC""", (region, OUTBREAK_WINDOW_HOURS, threshold))
+    alerts = []
+    for diagnosis_category, case_count in rows:
+        severity = "alert" if case_count > threshold * 2 else "watch"
+        alerts.append({
+            "diagnosis_category": diagnosis_category,
+            "case_count": int(case_count),
+            "window_hours": OUTBREAK_WINDOW_HOURS,
+            "threshold": threshold,
+            "severity": severity,
+            "message": f"{case_count} cases of {diagnosis_category} reported in {region} in the last {OUTBREAK_WINDOW_HOURS} hours",
+        })
+    return {"region": region, "alerts": alerts}
 
 
 @app.get("/api/surveillance/{region}")
