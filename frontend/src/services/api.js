@@ -47,13 +47,6 @@ export async function getSurveillanceDashboard() {
   });
 }
 
-export async function postSyncBatch(batch) {
-  return request('/api/sync/batch', {
-    method: 'POST',
-    body: JSON.stringify({ batch }),
-  });
-}
-
 export async function signupDoctor(payload) {
   return request('/api/auth/doctor/signup', { method: 'POST', body: JSON.stringify(payload) });
 }
@@ -90,7 +83,6 @@ export async function getOutbreakCheck(region) {
 export const api = {
   getSurveillance,
   getSurveillanceDashboard,
-  postSyncBatch,
   signupDoctor,
   loginDoctor,
   pullPatientDelta,
