@@ -3,37 +3,30 @@ import QRScanner from '../components/QRScanner';
 import MedicalTimeline from '../components/MedicalTimeline';
 
 export default function PatientPortal() {
-  const [patientId, setPatientId] = useState(null);
   const [patientData, setPatientData] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchPatientDetails = async (qrId) => {
-    setLoading(true);
+  const handleScanSuccess = (historyArray) => {
     setError(null);
-    setPatientId(qrId);
-    
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${baseUrl}/api/patient/${qrId}`);
+      const patient_qr_id = historyArray.length > 0 
+        ? `patient_${historyArray[0].doctor_name?.replace(/\s+/g, '_') || 'record'}_${Date.now()}`
+        : 'unknown_patient';
       
-      if (!response.ok) {
-        throw new Error(`Failed to retrieve patient (Status: ${response.status})`);
-      }
-      
-      const data = await response.json();
-      setPatientData(data);
+      setPatientData({
+        patient_qr_id,
+        medical_history: historyArray,
+        annotations: [],
+        progression_alerts: []
+      });
     } catch (err) {
-      console.error('Fetch patient error:', err);
-      setError(err.message || 'Error fetching patient information.');
+      console.error('Scan processing error:', err);
+      setError(err.message || 'Failed to process QR code');
       setPatientData(null);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleReset = () => {
-    setPatientId(null);
     setPatientData(null);
     setError(null);
   };
@@ -45,18 +38,33 @@ export default function PatientPortal() {
           Patient Portal
         </h1>
         <p className="text-lg text-gray-600">
-          Scan QR code to access electronic health records and history
+          Scan QR code to access your health records and history
         </p>
+        
+        {/* Privacy by Design Notice */}
+        <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 shadow-sm">
+          <div className="flex items-start gap-3">
+            <svg className="flex-shrink-0 mt-0.5 h-5 w-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <div className="text-left">
+              <p className="font-semibold text-emerald-800">Privacy by Design</p>
+              <p className="text-sm mt-1">
+                Doctors can only see your history if you share your QR code. Nothing is stored on any server.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="max-w-4xl mx-auto">
-        {!patientId ? (
-          <QRScanner onScanSuccess={fetchPatientDetails} />
+        {!patientData ? (
+          <QRScanner onScanSuccess={handleScanSuccess} />
         ) : (
           <div className="space-y-6">
             <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-200">
               <span className="text-sm font-semibold text-gray-600">
-                Viewing Record: <span className="font-mono text-gray-900">{patientId}</span>
+                Viewing Record: <span className="font-mono text-gray-900">{patientData.patient_qr_id}</span>
               </span>
               <button
                 onClick={handleReset}
@@ -65,16 +73,6 @@ export default function PatientPortal() {
                 Scan Another Code
               </button>
             </div>
-
-            {loading && (
-              <div className="text-center py-12 bg-white rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center">
-                <svg className="animate-spin h-10 w-10 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <p className="text-gray-600 font-medium">Fetching patient medical records...</p>
-              </div>
-            )}
 
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-lg text-center shadow-sm">
@@ -89,7 +87,7 @@ export default function PatientPortal() {
               </div>
             )}
 
-            {!loading && !error && patientData && (
+            {patientData && (
               <MedicalTimeline patientData={patientData} />
             )}
           </div>

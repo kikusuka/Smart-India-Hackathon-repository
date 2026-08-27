@@ -1,38 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
 import QrScanner from 'qr-scanner';
+import { decodeQRToHistory } from '../services/localHistory';
 
 export default function QRScanner({ onScanSuccess }) {
   const videoRef = useRef(null);
   const [scannerActive, setScannerActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
-  const [manualId, setManualId] = useState('');
+  const [manualData, setManualData] = useState('');
   const qrScannerRef = useRef(null);
 
   const startScanner = async () => {
     setCameraError(null);
     setScannerActive(true);
     
-    // Small delay to ensure the video ref is bound to the DOM
     setTimeout(async () => {
       if (!videoRef.current) return;
       try {
         const qrScanner = new QrScanner(
           videoRef.current,
           (result) => {
-            const qrId = typeof result === 'object' ? result.data : result;
-            if (qrId) {
-              // Extract UUID from full URL if scanned value is a link
-              let cleanId = qrId;
+            const qrData = typeof result === 'object' ? result.data : result;
+            if (qrData) {
               try {
-                if (qrId.includes('/')) {
-                  const parts = qrId.split('/');
-                  cleanId = parts[parts.length - 1];
-                }
-              } catch (e) {
-                // fallback
+                const historyArray = decodeQRToHistory(qrData);
+                onScanSuccess(historyArray);
+                stopScanner();
+              } catch (err) {
+                console.error('QR decode error:', err);
+                setCameraError(`Invalid QR code: ${err.message}`);
               }
-              onScanSuccess(cleanId);
-              stopScanner();
             }
           },
           {
@@ -69,8 +65,13 @@ export default function QRScanner({ onScanSuccess }) {
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
-    if (manualId.trim()) {
-      onScanSuccess(manualId.trim());
+    if (manualData.trim()) {
+      try {
+        const historyArray = decodeQRToHistory(manualData.trim());
+        onScanSuccess(historyArray);
+      } catch (err) {
+        setCameraError(`Invalid QR data: ${err.message}`);
+      }
     }
   };
 
@@ -118,23 +119,25 @@ export default function QRScanner({ onScanSuccess }) {
       <div className="border-t border-gray-200 pt-4">
         <form onSubmit={handleManualSubmit} className="flex flex-col gap-2">
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Or enter Patient QR ID / UUID manually
+            Or paste QR data string manually (fallback)
           </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
-              value={manualId}
-              onChange={(e) => setManualId(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          <div className="flex flex-col gap-2">
+            <textarea
+              placeholder="Paste the QR code data string here..."
+              value={manualData}
+              onChange={(e) => setManualData(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-h-[60px] resize-y"
             />
             <button
               type="submit"
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded text-sm shadow transition"
             >
-              Retrieve
+              Decode & View History
             </button>
           </div>
+          <p className="text-xs text-gray-400 italic">
+            Manual UUID/ID entry no longer works in offline mode — QR data is self-contained.
+          </p>
         </form>
       </div>
     </div>

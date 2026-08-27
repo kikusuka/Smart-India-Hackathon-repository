@@ -1,5 +1,48 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+
+const mockRegions = [
+  {
+    region: 'North District',
+    alert_level: 'red',
+    case_count: 1247,
+    top_diagnoses: ['fever', 'cough', 'diarrhea']
+  },
+  {
+    region: 'South District',
+    alert_level: 'yellow',
+    case_count: 892,
+    top_diagnoses: ['fever', 'injury', 'rash']
+  },
+  {
+    region: 'East District',
+    alert_level: 'green',
+    case_count: 456,
+    top_diagnoses: ['cough', 'fever']
+  },
+  {
+    region: 'West District',
+    alert_level: 'yellow',
+    case_count: 723,
+    top_diagnoses: ['diarrhea', 'fever', 'injury']
+  },
+  {
+    region: 'Central District',
+    alert_level: 'red',
+    case_count: 1589,
+    top_diagnoses: ['fever', 'cough', 'diarrhea', 'rash']
+  },
+  {
+    region: 'Coastal Region',
+    alert_level: 'green',
+    case_count: 334,
+    top_diagnoses: ['injury', 'rash']
+  }
+];
+
+const mockNationalStats = {
+  total_diagnoses: 5241,
+  outbreak_alerts: 2
+};
 
 export default function SurveillanceDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
@@ -7,20 +50,20 @@ export default function SurveillanceDashboard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    async function fetchData() {
+    setTimeout(() => {
       try {
         setLoading(true);
         setError(null);
-        const data = await api.getSurveillanceDashboard();
-        setDashboardData(data);
+        setDashboardData({
+          regions: mockRegions,
+          national_stats: mockNationalStats
+        });
       } catch (err) {
-        setError(err.message || 'Failed to fetch dashboard data');
+        setError(err.message || 'Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
-    }
-
-    fetchData();
+    }, 500);
   }, []);
 
   if (loading) {
@@ -74,6 +117,20 @@ export default function SurveillanceDashboard() {
 
   return (
     <div className="space-y-8">
+      {/* Demo Mode Banner */}
+      <div className="bg-amber-50 border-2 border-amber-200 rounded-lg p-4 flex items-center gap-4">
+        <svg className="flex-shrink-0 h-6 w-6 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+        </svg>
+        <div>
+          <p className="font-bold text-amber-800">Demo Mode — Mock Data</p>
+          <p className="text-sm text-amber-700">
+            This surveillance dashboard uses hardcoded sample data for demonstration purposes.
+            In production, this would connect to the backend API for real-time regional outbreak data.
+          </p>
+        </div>
+      </div>
+
       {/* National Statistics Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-lg shadow-lg">
         <h1 className="text-2xl font-bold mb-4">National Health Surveillance Overview</h1>

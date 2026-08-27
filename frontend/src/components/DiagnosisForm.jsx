@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { encodeHistoryToQR, createDiagnosisRecord, addDiagnosisToHistory } from '../services/localHistory';
 
 const CATEGORIES = ['fever', 'cough', 'injury', 'rash', 'diarrhea', 'other'];
 const LANGUAGES = [
@@ -9,7 +10,7 @@ const LANGUAGES = [
   { code: 'ta', label: 'Tamil (தமிழ்)' }
 ];
 
-export default function DiagnosisForm({ isOnline = true, onOfflineSubmit }) {
+export default function DiagnosisForm({ isOnline = true, existingHistory = [] }) {
   const [formData, setFormData] = useState({
     doctor_name: '',
     doctor_id: '',
@@ -39,61 +40,22 @@ export default function DiagnosisForm({ isOnline = true, onOfflineSubmit }) {
     setQrCode(null);
     setSuccessMsg('');
 
-    const payload = {
-      ...formData,
-      diagnosis_date: new Date().toISOString()
-    };
-
-    if (!isOnline) {
-      // Offline mode
-      if (onOfflineSubmit) {
-        onOfflineSubmit(payload);
-        setSuccessMsg('Diagnosis saved locally. It will be synced when online.');
-      } else {
-        // Save to local storage as fallback
-        const offlineQueue = JSON.parse(localStorage.getItem('offline_diagnoses') || '[]');
-        offlineQueue.push({
-          id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2),
-          ...payload,
-          offline_created_at: payload.diagnosis_date
-        });
-        localStorage.setItem('offline_diagnoses', JSON.stringify(offlineQueue));
-        setSuccessMsg('Saved offline! The diagnosis has been queued for sync.');
-      }
-      setLoading(false);
-      return;
-    }
+    const newDiagnosis = createDiagnosisRecord(formData);
+    const updatedHistory = addDiagnosisToHistory(existingHistory, newDiagnosis);
 
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${baseUrl}/api/diagnosis`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server returned status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      if (result.success && result.qr_data) {
-        setQrCode(result.qr_data.qr_code_base64);
-        setSuccessMsg('Diagnosis submitted successfully!');
-      } else {
-        throw new Error(result.error || 'Submission failed');
-      }
+      const qrData = encodeHistoryToQR(updatedHistory);
+      setQrCode(qrData);
+      setSuccessMsg('Diagnosis added! Patient QR code generated below.');
     } catch (err) {
-      setError(err.message || 'An error occurred during submission.');
+      setError(err.message || 'Failed to generate QR code');
     } finally {
       setLoading(false);
     }
   };
 
-  const qrSrc = qrCode 
-    ? (qrCode.startsWith('data:image/') ? qrCode : `data:image/png;base64,${qrCode}`)
+  const qrSrc = qrCode
+    ? `data:image/png;base64,${qrCode}`
     : null;
 
   return (
@@ -101,9 +63,9 @@ export default function DiagnosisForm({ isOnline = true, onOfflineSubmit }) {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">New Patient Diagnosis</h2>
         <div className="flex items-center gap-2">
-          <span className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`}></span>
+          <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
           <span className="text-sm font-semibold text-gray-600">
-            {isOnline ? 'Online Mode' : 'Offline Mode'}
+            Offline-First Mode
           </span>
         </div>
       </div>
@@ -123,7 +85,11 @@ export default function DiagnosisForm({ isOnline = true, onOfflineSubmit }) {
       {qrSrc && (
         <div className="mb-8 p-6 bg-blue-50 rounded-lg border border-blue-200 flex flex-col items-center justify-center">
           <h3 className="text-lg font-bold text-blue-900 mb-2">Patient QR Code Generated</h3>
-          <p className="text-sm text-blue-700 mb-4 text-center">Scan this code to retrieve patient details or print for physical records.</p>
+          <p className="text-sm text-blue-700 mb-4 text-center">
+            This QR contains the complete medical history. Show/save it for the patient.
+            <br />
+            <span className="font-semibold text-blue-800">Nothing is sent to any server.</span>
+          </p>
           <img src={qrSrc} alt="Patient QR Code" className="w-48 h-48 bg-white p-2 border border-gray-300 rounded-md shadow-sm" />
           <button 
             onClick={() => {
@@ -277,12 +243,10 @@ export default function DiagnosisForm({ isOnline = true, onOfflineSubmit }) {
           className={`w-full py-3 px-4 rounded-md font-semibold text-white transition ${
             loading 
               ? 'bg-gray-400 cursor-not-allowed' 
-              : isOnline 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-amber-600 hover:bg-amber-700'
+              : 'bg-emerald-600 hover:bg-emerald-700'
           }`}
         >
-          {loading ? 'Submitting...' : isOnline ? 'Submit Diagnosis' : 'Save Offline'}
+          {loading ? 'Generating QR...' : 'Add Diagnosis & Generate QR'}
         </button>
       </form>
     </div>
