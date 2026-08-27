@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import QRScanner from '../components/QRScanner';
 import MedicalTimeline from '../components/MedicalTimeline';
+import InfoTooltip from '../components/InfoTooltip';
 
 export default function PatientPortal() {
   const [patientData, setPatientData] = useState(null);
@@ -59,7 +60,13 @@ export default function PatientPortal() {
 
       <div className="max-w-4xl mx-auto">
         {!patientData ? (
-          <QRScanner onScanSuccess={handleScanSuccess} />
+          <>
+            <div className="mb-3 flex items-center justify-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <span>Patient QR scanner</span>
+              <InfoTooltip label="Explain patient QR scanner">Scan the QR code your doctor gave you to view your medical history. This works completely offline.</InfoTooltip>
+            </div>
+            <QRScanner onScanSuccess={handleScanSuccess} />
+          </>
         ) : (
           <div className="space-y-6 animate-fade-in-up">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 transition-colors gap-4">

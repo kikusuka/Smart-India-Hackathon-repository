@@ -1,11 +1,12 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route, NavLink } from 'react-router-dom'
 import DoctorDashboard from './pages/DoctorDashboard'
 import PatientPortal from './pages/PatientPortal'
 import SurveillanceDashboard from './pages/SurveillanceDashboard'
 import DoctorAuth from './pages/DoctorAuth'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
+import { useAuth } from './context/AuthContext'
 
 function ThemeToggle() {
   const { isDark, toggleTheme } = useTheme();
@@ -25,6 +26,7 @@ function ThemeToggle() {
 }
 
 function AppContent() {
+  const { isAuthenticated, logout } = useAuth();
   const navLinkClass = ({ isActive }) => 
     `text-sm font-medium transition-colors ${isActive ? 'text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400 pb-1' : 'text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-300'}`;
 
@@ -36,18 +38,21 @@ function AppContent() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white font-casual tracking-tight">Rural Health Platform</h1>
               <nav className="mt-3 flex gap-6">
-                <NavLink to="/" className={navLinkClass}>Doctor Dashboard</NavLink>
+                {isAuthenticated && <NavLink to="/" className={navLinkClass}>Doctor Dashboard</NavLink>}
                 <NavLink to="/scan" className={navLinkClass}>Patient Portal</NavLink>
                 <NavLink to="/surveillance" className={navLinkClass}>Surveillance</NavLink>
                 <NavLink to="/auth" className={navLinkClass}>Doctor Access</NavLink>
               </nav>
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-3">
+              {isAuthenticated && <button onClick={logout} className="text-sm font-semibold text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-400">Logout</button>}
+              <ThemeToggle />
+            </div>
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
           <Routes>
-            <Route path="/" element={<DoctorDashboard />} />
+            <Route path="/" element={isAuthenticated ? <DoctorDashboard /> : <Navigate to="/auth" replace />} />
             <Route path="/scan" element={<PatientPortal />} />
             <Route path="/surveillance" element={<SurveillanceDashboard />} />
             <Route path="/auth" element={<DoctorAuth />} />

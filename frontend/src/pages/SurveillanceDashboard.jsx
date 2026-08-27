@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getOutbreakCheck } from '../services/api';
+import InfoTooltip from '../components/InfoTooltip';
 
 const mockRegions = [
   {
@@ -151,7 +152,7 @@ export default function SurveillanceDashboard() {
           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
         </svg>
         <div>
-          <p className="font-bold text-amber-800 dark:text-amber-300 text-lg">Prototype surveillance view</p>
+          <p className="font-bold text-amber-800 dark:text-amber-300 text-lg flex items-center gap-2">Prototype surveillance view <InfoTooltip label="Explain outbreak severity">This is a simple threshold-based alert system for demonstration — it flags when diagnosis reports in a region exceed expected levels within 72 hours. Not a clinical epidemiological model.</InfoTooltip></p>
           <p className="text-sm text-amber-700 dark:text-amber-400/80 mt-1">
             Outbreak alerts are calculated from recent recorded entries using a simple threshold-based heuristic for demonstration purposes.
           </p>

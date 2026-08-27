@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { loginDoctor, signupDoctor } from '../services/api';
 
 export default function DoctorAuth() {
   const { login, isAuthenticated, doctorName, logout } = useAuth();
+  const navigate = useNavigate();
   const [isSignup, setIsSignup] = useState(false);
   const [form, setForm] = useState({ doctor_id: '', doctor_name: '', region: '', password: '', confirm_password: '' });
   const [message, setMessage] = useState(null);
@@ -46,6 +48,7 @@ export default function DoctorAuth() {
         const result = await loginDoctor({ doctor_id: form.doctor_id.trim(), password: form.password });
         login(result.access_token, result.doctor_name);
         setMessage('Signed in successfully.');
+        navigate('/');
       }
     } catch (submitError) {
       setError(submitError.message || 'Unable to complete the request.');

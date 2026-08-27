@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import QRCode from 'qrcode';
+import InfoTooltip from './InfoTooltip';
 import { encodeHistoryToQR, createDiagnosisRecord, addDiagnosisToHistory } from '../services/localHistory';
 
 const CATEGORIES = ['fever', 'cough', 'injury', 'rash', 'diarrhea', 'other'];
@@ -88,7 +89,7 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
 
       {qrImage && (
         <div className="mb-10 p-8 bg-blue-50 dark:bg-slate-700/50 rounded-xl border border-blue-100 dark:border-slate-600 flex flex-col items-center justify-center text-center transition-colors">
-          <h3 className="text-xl font-bold text-blue-900 dark:text-blue-100 mb-2">Patient QR Code Generated</h3>
+          <h3 className="text-xl font-bold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">Patient QR Code Generated <InfoTooltip label="Explain patient QR code">This QR code contains your patient's full medical history, encoded and compressed. Nothing is sent to any server — scan it with any device running this app to view the history.</InfoTooltip></h3>
           <p className="text-sm text-blue-700 dark:text-blue-300 mb-6 max-w-sm">
             This QR contains the complete medical history. Show/save it for the patient.
             <span className="block mt-1 font-semibold text-blue-800 dark:text-blue-200">Nothing is sent to any server.</span>
