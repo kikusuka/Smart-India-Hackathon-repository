@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import DoctorDashboard from './pages/DoctorDashboard'
 import PatientPortal from './pages/PatientPortal'
 import SurveillanceDashboard from './pages/SurveillanceDashboard'
+import DoctorAuth from './pages/DoctorAuth'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
 
@@ -38,6 +39,7 @@ function AppContent() {
                 <NavLink to="/" className={navLinkClass}>Doctor Dashboard</NavLink>
                 <NavLink to="/scan" className={navLinkClass}>Patient Portal</NavLink>
                 <NavLink to="/surveillance" className={navLinkClass}>Surveillance</NavLink>
+                <NavLink to="/auth" className={navLinkClass}>Doctor Access</NavLink>
               </nav>
             </div>
             <ThemeToggle />
@@ -48,6 +50,7 @@ function AppContent() {
             <Route path="/" element={<DoctorDashboard />} />
             <Route path="/scan" element={<PatientPortal />} />
             <Route path="/surveillance" element={<SurveillanceDashboard />} />
+            <Route path="/auth" element={<DoctorAuth />} />
           </Routes>
         </main>
       </div>

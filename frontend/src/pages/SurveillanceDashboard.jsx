@@ -145,15 +145,15 @@ export default function SurveillanceDashboard() {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto py-4 px-2 sm:px-4 transition-colors duration-300">
-      {/* Updated Demo Mode Banner */}
+      {/* Prototype data notice */}
       <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-5 flex items-center gap-4 shadow-sm transition-colors">
         <svg className="flex-shrink-0 h-8 w-8 text-amber-600 dark:text-amber-400" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
         </svg>
         <div>
-          <p className="font-bold text-amber-800 dark:text-amber-300 text-lg">Demo Mode — Partial Mock Data</p>
+          <p className="font-bold text-amber-800 dark:text-amber-300 text-lg">Prototype surveillance view</p>
           <p className="text-sm text-amber-700 dark:text-amber-400/80 mt-1">
-            Outbreak alerts below are live from real data — other statistics shown are demo/sample data.
+            Outbreak alerts are calculated from recent recorded entries using a simple threshold-based heuristic for demonstration purposes.
           </p>
         </div>
       </div>
@@ -218,9 +218,18 @@ export default function SurveillanceDashboard() {
                           <p className="text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider">Live Outbreak Alert</p>
                           <div className="mt-1 space-y-1">
                             {alerts.map((alert, alertIdx) => (
-                              <p key={alertIdx} className="text-sm text-red-700 dark:text-red-300 font-medium">
-                                {alert.case_count} cases of {alert.diagnosis_category} reported in {alert.message?.includes('in ') ? alert.message.split('in ')[1] : alert.region} in the last {alert.window_hours} hours
-                              </p>
+                              <div key={alertIdx} className="flex items-start gap-2 text-sm font-medium">
+                                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                                  alert.severity === 'critical'
+                                    ? 'bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-100'
+                                    : alert.severity === 'alert'
+                                      ? 'bg-orange-200 text-orange-900 dark:bg-orange-800 dark:text-orange-100'
+                                      : 'bg-yellow-200 text-yellow-900 dark:bg-yellow-800 dark:text-yellow-100'
+                                }`}>
+                                  {alert.severity || 'watch'}
+                                </span>
+                                <p className="text-red-700 dark:text-red-300">{alert.message}</p>
+                              </div>
                             ))}
                           </div>
                         </div>

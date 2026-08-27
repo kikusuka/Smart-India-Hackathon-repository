@@ -14,7 +14,7 @@ import psycopg2
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 try:
     import qrcode
@@ -29,6 +29,7 @@ SESSION_TTL = timedelta(days=7)
 bearer_scheme = HTTPBearer(auto_error=False)
 OUTBREAK_WINDOW_HOURS = 72
 OUTBREAK_THRESHOLD = 5
+DIAGNOSIS_CATEGORIES = ("fever", "cough", "injury", "rash", "diarrhea", "other")
 
 app = FastAPI(title="Rural Health Platform API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -65,8 +66,15 @@ class BatchRequest(BaseModel):
 class DoctorSignupRequest(BaseModel):
     doctor_id: str = Field(min_length=1, max_length=120)
     doctor_name: str = Field(min_length=1, max_length=200)
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=1, max_length=128)
     region: str = Field(min_length=1, max_length=200)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        return value
 
 
 class DoctorLoginRequest(BaseModel):
@@ -282,7 +290,7 @@ def doctor_signup(payload: DoctorSignupRequest):
             try:
                 cur.execute("INSERT INTO doctors (doctor_id, doctor_name, password_hash, region) VALUES (%s, %s, %s, %s)", (payload.doctor_id, payload.doctor_name, password_hash(payload.password), payload.region))
             except psycopg2.errors.UniqueViolation:
-                raise HTTPException(status_code=409, detail="doctor_id is already registered")
+                raise HTTPException(status_code=409, detail="This Doctor ID is already registered.")
     return {"success": True, "doctor_id": payload.doctor_id}
 
 
@@ -400,9 +408,14 @@ def outbreak_check(region: str, threshold: int = Query(default=OUTBREAK_THRESHOL
         WHERE region = %s AND created_at >= NOW() - (%s * INTERVAL '1 hour')
         GROUP BY diagnosis_category HAVING COUNT(*) > %s
         ORDER BY case_count DESC, diagnosis_category ASC""", (region, OUTBREAK_WINDOW_HOURS, threshold))
+    counts = {diagnosis_category: int(case_count) for diagnosis_category, case_count in rows}
     alerts = []
-    for diagnosis_category, case_count in rows:
-        severity = "alert" if case_count > threshold * 2 else "watch"
+    # This is a simple threshold-based heuristic for demonstration purposes, not a clinical epidemiological model.
+    for diagnosis_category in DIAGNOSIS_CATEGORIES:
+        case_count = counts.get(diagnosis_category, 0)
+        if case_count <= threshold:
+            continue
+        severity = "critical" if case_count > threshold * 2 else "alert"
         alerts.append({
             "diagnosis_category": diagnosis_category,
             "case_count": int(case_count),

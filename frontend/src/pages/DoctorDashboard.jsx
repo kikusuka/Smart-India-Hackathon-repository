@@ -55,7 +55,7 @@ export default function DoctorDashboard() {
                   <p className="text-2xl font-extrabold text-gray-900 dark:text-white mt-1">{stats?.total_diagnoses || 0}</p>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 border border-slate-100 dark:border-slate-600 min-w-[140px] text-center">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Accuracy Score</p>
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Confirmation Rate</p>
                   <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{accuracyDisplay}</p>
                 </div>
                 {statsLoading && (

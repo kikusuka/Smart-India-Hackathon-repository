@@ -20,9 +20,16 @@ async function request(endpoint, options = {}) {
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(
-      `Request failed: ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ''}`
-    );
+    let detail = errorBody;
+    try {
+      const parsed = JSON.parse(errorBody);
+      detail = Array.isArray(parsed.detail)
+        ? parsed.detail.map((item) => item.msg).filter(Boolean).join(' ')
+        : parsed.detail || parsed.message || errorBody;
+    } catch {
+      // Keep plain-text server errors usable in the form.
+    }
+    throw new Error(detail || `Request failed: ${response.status} ${response.statusText}`);
   }
 
   return response.json();
