@@ -4,6 +4,7 @@ import DoctorDashboard from './pages/DoctorDashboard'
 import PatientPortal from './pages/PatientPortal'
 import SurveillanceDashboard from './pages/SurveillanceDashboard'
 import DoctorAuth from './pages/DoctorAuth'
+import SupervisorView from './pages/SupervisorView'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './context/AuthContext'
@@ -39,6 +40,7 @@ function AppContent() {
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white font-casual tracking-tight">Rural Health Platform</h1>
               <nav className="mt-3 flex gap-6">
                 {isAuthenticated && <NavLink to="/" className={navLinkClass}>Doctor Dashboard</NavLink>}
+                {isAuthenticated && <NavLink to="/supervisor" className={navLinkClass}>Supervisor</NavLink>}
                 <NavLink to="/scan" className={navLinkClass}>Patient Portal</NavLink>
                 <NavLink to="/surveillance" className={navLinkClass}>Surveillance</NavLink>
                 <NavLink to="/auth" className={navLinkClass}>Doctor Access</NavLink>
@@ -56,6 +58,7 @@ function AppContent() {
             <Route path="/scan" element={<PatientPortal />} />
             <Route path="/surveillance" element={<SurveillanceDashboard />} />
             <Route path="/auth" element={<DoctorAuth />} />
+            <Route path="/supervisor" element={isAuthenticated ? <SupervisorView /> : <Navigate to="/auth" replace />} />
           </Routes>
         </main>
       </div>

@@ -180,6 +180,26 @@ export default function MedicalTimeline({ patientData }) {
                         </div>
                       </div>
                     </div>
+                    {item.follow_up_date && (
+                      <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-800/50 dark:bg-blue-900/20">
+                        <p className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Follow-up scheduled</p>
+                        <p className="mt-1 font-semibold text-blue-900 dark:text-blue-100">{item.follow_up_type || 'Follow-up visit'} · {item.follow_up_date}</p>
+                      </div>
+                    )}
+                    {item.checklist_data && Object.keys(item.checklist_data).length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          ['vaccination_status_confirmed', 'Vaccination'],
+                          ['weight_recorded', 'Weight'],
+                          ['caregiver_counseled', 'Caregiver counseled'],
+                          ['danger_signs_discussed', 'Danger signs'],
+                        ].map(([key, label]) => (
+                          <span key={key} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${item.checklist_data[key] ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`} title={`${label}: ${item.checklist_data[key] ? 'complete' : 'not complete'}`}>
+                            <span aria-hidden="true">{item.checklist_data[key] ? '✓' : '○'}</span>{label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

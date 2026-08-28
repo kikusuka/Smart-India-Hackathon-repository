@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DiagnosisForm from '../components/DiagnosisForm';
 import { useAuth } from '../context/AuthContext';
 import InfoTooltip from '../components/InfoTooltip';
+import UpcomingFollowUps from '../components/UpcomingFollowUps';
 
 export default function DoctorDashboard() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -78,6 +79,7 @@ export default function DoctorDashboard() {
       <div className="max-w-4xl mx-auto">
         <DiagnosisForm isOnline={isOnline} />
       </div>
+      <UpcomingFollowUps />
     </div>
   );
 }

@@ -103,7 +103,10 @@ export function createDiagnosisRecord(formData) {
     diagnosis_text: formData.diagnosis_text,
     treatment_text: formData.treatment_text,
     medicine: formData.medicine_prescribed,
-    dosage: formData.dosage
+    dosage: formData.dosage,
+    follow_up_date: formData.follow_up_date || null,
+    follow_up_type: formData.follow_up_type || null,
+    checklist_data: formData.checklist_data || {}
   };
 }
 

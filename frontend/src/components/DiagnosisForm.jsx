@@ -3,6 +3,8 @@ import QRCode from 'qrcode';
 import InfoTooltip from './InfoTooltip';
 import { useAuth } from '../context/AuthContext';
 import { encodeHistoryToQR, createDiagnosisRecord, addDiagnosisToHistory } from '../services/localHistory';
+import { saveFollowUp } from '../services/followUps';
+import { scheduleFollowUpNotification } from '../services/localNotifications';
 
 const CATEGORIES = ['fever', 'cough', 'injury', 'rash', 'diarrhea', 'other'];
 const LANGUAGES = [
@@ -22,7 +24,15 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
     medicine_prescribed: '',
     dosage: '',
     region: '',
-    language: 'en'
+    language: 'en',
+    follow_up_date: '',
+    follow_up_type: '',
+    checklist_data: {
+      vaccination_status_confirmed: false,
+      weight_recorded: false,
+      caregiver_counseled: false,
+      danger_signs_discussed: false,
+    },
   });
 
   const [loading, setLoading] = useState(false);
@@ -32,6 +42,13 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (e.target.type === 'checkbox') {
+      setFormData((prev) => ({
+        ...prev,
+        checklist_data: { ...prev.checklist_data, [name]: e.target.checked },
+      }));
+      return;
+    }
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -47,9 +64,19 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
       doctor_id: doctorId,
       doctor_name: doctorName || doctorId,
     });
+    newDiagnosis.follow_up_date = formData.follow_up_date || null;
+    newDiagnosis.follow_up_type = formData.follow_up_type || null;
+    newDiagnosis.checklist_data = formData.checklist_data;
     const updatedHistory = addDiagnosisToHistory(existingHistory, newDiagnosis);
 
     try {
+      if (formData.follow_up_date) {
+        const followUp = await saveFollowUp({
+          follow_up_date: formData.follow_up_date,
+          follow_up_type: formData.follow_up_type,
+        });
+        await scheduleFollowUpNotification(followUp);
+      }
       const qrData = encodeHistoryToQR(updatedHistory);
       const imageDataUrl = await QRCode.toDataURL(qrData, {
         errorCorrectionLevel: 'L',
@@ -248,6 +275,41 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
               />
             </div>
           </div>
+        </section>
+
+        <section className="bg-slate-50 dark:bg-slate-700/30 p-5 rounded-lg border border-slate-100 dark:border-slate-700">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a3 3 0 016 0M9 13h6m-6 4h4" /></svg>
+            Follow-up Checklist
+          </h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {[
+              ['vaccination_status_confirmed', 'Vaccination status confirmed'],
+              ['weight_recorded', 'Weight recorded'],
+              ['caregiver_counseled', 'Mother/caregiver counseled'],
+              ['danger_signs_discussed', 'Danger signs discussed'],
+            ].map(([name, label]) => (
+              <label key={name} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200">
+                <input type="checkbox" name={name} checked={formData.checklist_data[name]} onChange={handleChange} className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                {label}
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="bg-slate-50 dark:bg-slate-700/30 p-5 rounded-lg border border-slate-100 dark:border-slate-700">
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-4">Schedule Follow-up</h3>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase">Follow-up date</label>
+              <input type="date" name="follow_up_date" value={formData.follow_up_date} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase">Follow-up type</label>
+              <input type="text" name="follow_up_type" value={formData.follow_up_type} onChange={handleChange} placeholder="Vaccination follow-up" className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">Reminders are scheduled locally on this device.</p>
         </section>
 
         <div className="pt-4">

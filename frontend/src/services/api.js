@@ -80,6 +80,10 @@ export async function getOutbreakCheck(region) {
   return request(`/api/surveillance/outbreak-check/${encodeURIComponent(region)}`, { method: 'GET' });
 }
 
+export async function getSupervisorAdherence(region) {
+  return request(`/api/supervisor/adherence/${encodeURIComponent(region)}`, { method: 'GET' });
+}
+
 export const api = {
   getSurveillance,
   getSurveillanceDashboard,
@@ -90,6 +94,7 @@ export const api = {
   confirmDiagnosis,
   getDoctorStats,
   getOutbreakCheck,
+  getSupervisorAdherence,
 };
 
 export default api;

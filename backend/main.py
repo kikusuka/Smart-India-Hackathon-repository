@@ -47,6 +47,9 @@ class DiagnosisRequest(BaseModel):
     region: str
     language: str
     doctor_id: str
+    follow_up_date: str | None = None
+    follow_up_type: str | None = Field(default=None, max_length=200)
+    checklist_data: dict[str, bool] = Field(default_factory=dict)
 
 
 class BatchItem(BaseModel):
@@ -98,6 +101,9 @@ class SyncPushRequest(BaseModel):
     region: str = Field(min_length=1, max_length=200)
     created_at: str | None = None
     client_entry_id: str | None = Field(default=None, max_length=200)
+    follow_up_date: str | None = None
+    follow_up_type: str | None = Field(default=None, max_length=200)
+    checklist_data: dict[str, bool] = Field(default_factory=dict)
 
 
 def get_connection():
@@ -142,6 +148,8 @@ def init_db() -> None:
             medicine TEXT NOT NULL DEFAULT '', dosage TEXT NOT NULL DEFAULT '', region TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), client_entry_id TEXT UNIQUE,
             confirmed_at TIMESTAMPTZ, confirmed_by TEXT,
+            follow_up_date DATE, follow_up_type TEXT,
+            checklist_data JSONB NOT NULL DEFAULT '{}'::jsonb,
             UNIQUE (patient_qr_id, sequence_number))""",
     ]
     seeds = [
@@ -158,6 +166,9 @@ def init_db() -> None:
             cur.execute("ALTER TABLE doctor_stats ADD COLUMN IF NOT EXISTS last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()")
             cur.execute("ALTER TABLE diagnosis_entries ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ")
             cur.execute("ALTER TABLE diagnosis_entries ADD COLUMN IF NOT EXISTS confirmed_by TEXT")
+            cur.execute("ALTER TABLE diagnosis_entries ADD COLUMN IF NOT EXISTS follow_up_date DATE")
+            cur.execute("ALTER TABLE diagnosis_entries ADD COLUMN IF NOT EXISTS follow_up_type TEXT")
+            cur.execute("ALTER TABLE diagnosis_entries ADD COLUMN IF NOT EXISTS checklist_data JSONB NOT NULL DEFAULT '{}'::jsonb")
             cur.execute("""UPDATE doctor_stats SET accuracy_score =
                 confirmed_accurate::DOUBLE PRECISION / NULLIF(total_diagnoses, 0)""")
             for row in seeds:
@@ -247,7 +258,7 @@ def require_doctor(credentials: HTTPAuthorizationCredentials | None = Depends(be
     return doctor_id
 
 
-def insert_sequence_entry(cur, patient_qr_id: str, doctor_id: str, doctor_name: str, category: str, diagnosis_text: str, treatment_text: str, medicine: str, dosage: str, region: str, created_at: datetime, client_entry_id: str | None = None):
+def insert_sequence_entry(cur, patient_qr_id: str, doctor_id: str, doctor_name: str, category: str, diagnosis_text: str, treatment_text: str, medicine: str, dosage: str, region: str, created_at: datetime, client_entry_id: str | None = None, follow_up_date: str | None = None, follow_up_type: str | None = None, checklist_data: dict[str, bool] | None = None):
     cur.execute("INSERT INTO patients (patient_qr_id) VALUES (%s) ON CONFLICT (patient_qr_id) DO NOTHING", (patient_qr_id,))
     cur.execute("SELECT id FROM patients WHERE patient_qr_id = %s FOR UPDATE", (patient_qr_id,))
     if client_entry_id:
@@ -258,11 +269,13 @@ def insert_sequence_entry(cur, patient_qr_id: str, doctor_id: str, doctor_name: 
     cur.execute("SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM diagnosis_entries WHERE patient_qr_id = %s", (patient_qr_id,))
     sequence_number = cur.fetchone()[0]
     entry_id = str(uuid.uuid4())
+    follow_up_dt = datetime.strptime(follow_up_date, "%Y-%m-%d").date() if follow_up_date else None
     cur.execute("""INSERT INTO diagnosis_entries
         (id, patient_qr_id, sequence_number, doctor_id, doctor_name, diagnosis_category,
-         diagnosis_text, treatment_text, medicine, dosage, region, created_at, client_entry_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-        (entry_id, patient_qr_id, sequence_number, doctor_id, doctor_name, category, diagnosis_text, treatment_text, medicine, dosage, region, created_at, client_entry_id))
+         diagnosis_text, treatment_text, medicine, dosage, region, created_at, client_entry_id,
+         follow_up_date, follow_up_type, checklist_data)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (entry_id, patient_qr_id, sequence_number, doctor_id, doctor_name, category, diagnosis_text, treatment_text, medicine, dosage, region, created_at, client_entry_id, follow_up_dt, follow_up_type, json.dumps(checklist_data or {})))
     return entry_id, sequence_number, True
 
 
@@ -315,10 +328,10 @@ def sync_pull(payload: SyncPullRequest, doctor_id: str = Depends(require_doctor)
     if not fetch_one("SELECT patient_qr_id FROM patients WHERE patient_qr_id = %s", (payload.patient_qr_id,)):
         return {"success": True, "patient_qr_id": payload.patient_qr_id, "entries": [], "max_sequence_number": 0}
     rows = fetch_all("""SELECT id, sequence_number, doctor_id, doctor_name, diagnosis_category, diagnosis_text,
-        treatment_text, medicine, dosage, region, created_at FROM diagnosis_entries
+        treatment_text, medicine, dosage, region, created_at, follow_up_date, follow_up_type, checklist_data FROM diagnosis_entries
         WHERE patient_qr_id = %s AND sequence_number > %s ORDER BY sequence_number ASC""", (payload.patient_qr_id, payload.since_sequence))
     max_row = fetch_one("SELECT COALESCE(MAX(sequence_number), 0) FROM diagnosis_entries WHERE patient_qr_id = %s", (payload.patient_qr_id,))
-    entries = [{"id": str(row[0]), "sequence_number": row[1], "doctor_id": row[2], "doctor_name": row[3], "diagnosis_category": row[4], "diagnosis_text": row[5], "treatment_text": row[6], "medicine": row[7], "dosage": row[8], "region": row[9], "created_at": row[10].isoformat()} for row in rows]
+    entries = [{"id": str(row[0]), "sequence_number": row[1], "doctor_id": row[2], "doctor_name": row[3], "diagnosis_category": row[4], "diagnosis_text": row[5], "treatment_text": row[6], "medicine": row[7], "dosage": row[8], "region": row[9], "created_at": row[10].isoformat(), "follow_up_date": row[11].isoformat() if row[11] else None, "follow_up_type": row[12], "checklist_data": row[13] or {}} for row in rows]
     return {"success": True, "patient_qr_id": payload.patient_qr_id, "entries": entries, "max_sequence_number": int(max_row[0])}
 
 
@@ -326,9 +339,14 @@ def sync_pull(payload: SyncPullRequest, doctor_id: str = Depends(require_doctor)
 def sync_push(payload: SyncPushRequest, doctor_id: str = Depends(require_doctor)):
     doctor = fetch_one("SELECT doctor_name FROM doctors WHERE doctor_id = %s", (doctor_id,))
     created_at = parse_request_dt(payload.created_at, "created_at") if payload.created_at else datetime.now(timezone.utc)
+    if payload.follow_up_date:
+        try:
+            datetime.strptime(payload.follow_up_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=422, detail="follow_up_date must be in YYYY-MM-DD format")
     with get_connection() as conn:
         with conn.cursor() as cur:
-            entry_id, sequence_number, inserted = insert_sequence_entry(cur, payload.patient_qr_id, doctor_id, doctor[0], payload.diagnosis_category, payload.diagnosis_text, payload.treatment_text, payload.medicine, payload.dosage, payload.region, created_at, payload.client_entry_id)
+            entry_id, sequence_number, inserted = insert_sequence_entry(cur, payload.patient_qr_id, doctor_id, doctor[0], payload.diagnosis_category, payload.diagnosis_text, payload.treatment_text, payload.medicine, payload.dosage, payload.region, created_at, payload.client_entry_id, payload.follow_up_date, payload.follow_up_type, payload.checklist_data)
             if inserted:
                 increment_doctor_diagnoses(cur, doctor_id, doctor[0])
     return {"success": True, "patient_qr_id": payload.patient_qr_id, "entry_id": str(entry_id), "sequence_number": int(sequence_number)}
@@ -369,11 +387,43 @@ def get_doctor_stats(doctor_id: str, current_doctor_id: str = Depends(require_do
     return {"doctor_id": row[0], "doctor_name": row[1], "total_diagnoses": row[2], "confirmed_accurate": row[3], "accuracy_score": row[4]}
 
 
+@app.get("/api/supervisor/adherence/{region}")
+def supervisor_adherence(region: str, current_doctor_id: str = Depends(require_doctor)):
+    rows = fetch_all("""SELECT e.id, e.patient_qr_id, e.follow_up_date, e.follow_up_type, e.doctor_name,
+        EXISTS (
+            SELECT 1 FROM diagnosis_entries later
+            WHERE later.patient_qr_id = e.patient_qr_id
+              AND later.created_at::DATE > e.follow_up_date
+        ) AS completed
+        FROM diagnosis_entries e
+        WHERE e.region = %s AND e.follow_up_date IS NOT NULL
+        ORDER BY e.follow_up_date ASC, e.created_at ASC""", (region,))
+    completed_count = sum(1 for row in rows if row[5])
+    today = datetime.now(timezone.utc).date()
+    overdue = [
+        {
+            "entry_id": str(row[0]),
+            "patient_qr_id": row[1],
+            "follow_up_date": row[2].isoformat(),
+            "follow_up_type": row[3],
+            "doctor_name": row[4],
+        }
+        for row in rows
+        if row[2] < today and not row[5]
+    ]
+    return {"total_scheduled": len(rows), "completed": completed_count, "overdue": overdue}
+
+
 @app.post("/api/diagnosis")
 def create_diagnosis(payload: DiagnosisRequest):
     patient_qr_id = str(uuid.uuid4())
     diagnosis_id = str(uuid.uuid4())
     diagnosis_dt = parse_request_dt(payload.diagnosis_date, "diagnosis_date")
+    if payload.follow_up_date:
+        try:
+            datetime.strptime(payload.follow_up_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=422, detail="follow_up_date must be in YYYY-MM-DD format")
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO diagnoses
@@ -381,7 +431,7 @@ def create_diagnosis(payload: DiagnosisRequest):
                  treatment_text, medicine_prescribed, dosage, diagnosis_date, region, language)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (diagnosis_id, patient_qr_id, payload.doctor_name, payload.doctor_id, payload.diagnosis_text, payload.diagnosis_category, payload.treatment_text, payload.medicine_prescribed, payload.dosage, diagnosis_dt, payload.region, payload.language))
-            insert_sequence_entry(cur, patient_qr_id, payload.doctor_id, payload.doctor_name, payload.diagnosis_category, payload.diagnosis_text, payload.treatment_text, payload.medicine_prescribed, payload.dosage, payload.region, diagnosis_dt, diagnosis_id)
+            insert_sequence_entry(cur, patient_qr_id, payload.doctor_id, payload.doctor_name, payload.diagnosis_category, payload.diagnosis_text, payload.treatment_text, payload.medicine_prescribed, payload.dosage, payload.region, diagnosis_dt, diagnosis_id, payload.follow_up_date, payload.follow_up_type, payload.checklist_data)
             increment_doctor_diagnoses(cur, payload.doctor_id, payload.doctor_name)
     return {"success": True, "qr_data": {"patient_qr_id": patient_qr_id, "qr_code_base64": make_qr_base64(patient_qr_id)}}
 
