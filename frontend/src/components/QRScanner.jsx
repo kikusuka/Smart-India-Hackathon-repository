@@ -22,7 +22,7 @@ export default function QRScanner({ onScanSuccess }) {
       try {
         const qrScanner = new QrScanner(
           videoRef.current,
-          (result) => {
+          async (result) => {
             const qrData = typeof result === 'object' ? result.data : result;
             console.info('QR scanner detected a code', {
               length: qrData?.length || 0,
@@ -30,7 +30,7 @@ export default function QRScanner({ onScanSuccess }) {
             });
             if (qrData) {
               try {
-                const historyArray = decodeQRToHistory(qrData);
+                const historyArray = await decodeQRToHistory(qrData);
                 onScanSuccess(historyArray);
                 stopScanner();
               } catch (err) {
@@ -73,11 +73,11 @@ export default function QRScanner({ onScanSuccess }) {
     };
   }, []);
 
-  const handleManualSubmit = (e) => {
+  const handleManualSubmit = async (e) => {
     e.preventDefault();
     if (manualData.trim()) {
       try {
-        const historyArray = decodeQRToHistory(manualData.trim());
+        const historyArray = await decodeQRToHistory(manualData.trim());
         onScanSuccess(historyArray);
       } catch (err) {
         setCameraError(`Invalid QR data: ${err.message}`);

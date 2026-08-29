@@ -64,9 +64,6 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
       doctor_id: doctorId,
       doctor_name: doctorName || doctorId,
     });
-    newDiagnosis.follow_up_date = formData.follow_up_date || null;
-    newDiagnosis.follow_up_type = formData.follow_up_type || null;
-    newDiagnosis.checklist_data = formData.checklist_data;
     const updatedHistory = addDiagnosisToHistory(existingHistory, newDiagnosis);
 
     try {
