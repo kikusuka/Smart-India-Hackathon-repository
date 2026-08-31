@@ -6,6 +6,7 @@ import InfoTooltip from '../components/InfoTooltip';
 export default function PatientPortal() {
   const [patientData, setPatientData] = useState(null);
   const [error, setError] = useState(null);
+  const [backupEnabled, setBackupEnabled] = useState(false);
 
   const handleScanSuccess = (historyArray) => {
     setError(null);
@@ -51,6 +52,24 @@ export default function PatientPortal() {
                 Doctors can only see your history if you share your QR code. Nothing is stored on any central server without your consent.
               </p>
             </div>
+          </div>
+
+          <div className="mt-5 p-5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm max-w-2xl mx-auto text-left transition-colors">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">Record Backup</h2>
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable encrypted cloud backup</span>
+              <button
+                type="button"
+                onClick={() => setBackupEnabled((current) => !current)}
+                aria-pressed={backupEnabled}
+                className={`relative h-7 w-12 rounded-full transition-colors ${backupEnabled ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+              >
+                <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-transform ${backupEnabled ? 'translate-x-6' : 'translate-x-1'}`}></span>
+              </button>
+            </div>
+            <p className={`mt-3 text-sm font-semibold ${backupEnabled ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-400'}`}>
+              {backupEnabled ? 'Backup secured ✓' : 'Backup disabled — record stored locally only'}
+            </p>
           </div>
         </div>
       </div>

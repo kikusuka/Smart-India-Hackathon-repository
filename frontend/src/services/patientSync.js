@@ -33,6 +33,10 @@ export async function setLastSyncedSequence(patientQrId, sequence) {
   });
 }
 
+export async function listTrackedPatientQrIds() {
+  return (await (await getDB()).getAllKeys(STORE_NAME)).map(String);
+}
+
 export function mergeDiagnosisDelta(localHistory, entries) {
   const existing = Array.isArray(localHistory) ? localHistory : [];
   const knownIds = new Set(existing.map((record) => record.id).filter(Boolean));
@@ -53,6 +57,7 @@ export async function syncPatientDelta(patientQrId, localHistory = []) {
 export default {
   getLastSyncedSequence,
   setLastSyncedSequence,
+  listTrackedPatientQrIds,
   mergeDiagnosisDelta,
   syncPatientDelta,
 };

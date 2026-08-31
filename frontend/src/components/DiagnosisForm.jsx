@@ -74,7 +74,7 @@ export default function DiagnosisForm({ isOnline = true, existingHistory = [] })
         });
         await scheduleFollowUpNotification(followUp);
       }
-      const qrData = encodeHistoryToQR(updatedHistory);
+      const qrData = await encodeHistoryToQR(updatedHistory);
       const imageDataUrl = await QRCode.toDataURL(qrData, {
         errorCorrectionLevel: 'L',
         margin: 2,
