@@ -1,25 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import DiagnosisForm from '../components/DiagnosisForm';
 import { useAuth } from '../context/AuthContext';
 import InfoTooltip from '../components/InfoTooltip';
 import UpcomingFollowUps from '../components/UpcomingFollowUps';
+import { listTrackedPatientQrIds, syncPatientDelta } from '../services/patientSync';
 
 export default function DoctorDashboard() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [syncStatus, setSyncStatus] = useState('offline');
+  const syncStatusTimeoutRef = useRef(null);
   const { doctorId, doctorName, stats, loading: statsLoading, refetchStats, isAuthenticated } = useAuth();
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const triggerOpportunisticSync = async () => {
+      if (!isAuthenticated) return;
+      const trackedPatients = await listTrackedPatientQrIds();
+      await Promise.all(trackedPatients.map((patientQrId) => syncPatientDelta(patientQrId, [])));
+    };
+
+    const clearSyncTimer = () => {
+      if (syncStatusTimeoutRef.current) {
+        clearTimeout(syncStatusTimeoutRef.current);
+        syncStatusTimeoutRef.current = null;
+      }
+    };
+
+    const handleOnline = async () => {
+      setIsOnline(true);
+      setSyncStatus('syncing');
+      try {
+        await triggerOpportunisticSync();
+      } catch (error) {
+        console.error('Opportunistic sync failed:', error);
+      }
+      clearSyncTimer();
+      syncStatusTimeoutRef.current = setTimeout(() => {
+        setSyncStatus('synced');
+        syncStatusTimeoutRef.current = null;
+      }, 2000);
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      clearSyncTimer();
+      setSyncStatus('offline');
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      clearSyncTimer();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   const accuracyDisplay = stats?.accuracy_score !== null && stats?.accuracy_score !== undefined
     ? `${Math.round(stats.accuracy_score * 100)}%`
@@ -34,6 +69,24 @@ export default function DoctorDashboard() {
         <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto transition-colors">
           Record patient symptoms, generate offline-first QR histories, and synchronize data seamlessly.
         </p>
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+          {syncStatus === 'syncing' ? (
+            <>
+              <svg className="h-3.5 w-3.5 animate-spin text-blue-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+              <span>Syncing...</span>
+            </>
+          ) : syncStatus === 'synced' ? (
+            <>
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+              <span>Synced ✓</span>
+            </>
+          ) : (
+            <>
+              <span className="h-2.5 w-2.5 rounded-full bg-gray-400"></span>
+              <span>Offline</span>
+            </>
+          )}
+        </div>
       </div>
 
       {isAuthenticated && (
