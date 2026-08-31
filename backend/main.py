@@ -304,6 +304,11 @@ def health():
     return {"success": True}
 
 
+@app.get("/api/health")
+def api_health():
+    return {"success": True}
+
+
 @app.post("/api/auth/doctor/signup")
 def doctor_signup(payload: DoctorSignupRequest):
     with get_connection() as conn:

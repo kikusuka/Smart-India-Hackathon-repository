@@ -8,6 +8,7 @@ import SupervisorView from './pages/SupervisorView'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './context/AuthContext'
+import { BackendStatusProvider, useBackendStatus } from './context/BackendStatusContext'
 
 function ThemeToggle() {
   const { isDark, toggleTheme } = useTheme();
@@ -28,6 +29,7 @@ function ThemeToggle() {
 
 function AppContent() {
   const { isAuthenticated, logout } = useAuth();
+  const backendStatus = useBackendStatus();
   const navLinkClass = ({ isActive }) => 
     `text-sm font-medium transition-colors ${isActive ? 'text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400 pb-1' : 'text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-300'}`;
 
@@ -47,6 +49,10 @@ function AppContent() {
               </nav>
             </div>
             <div className="flex items-center gap-3">
+              <div className={`flex items-center gap-2 rounded-full border px-2.5 py-1.5 text-[11px] font-bold sm:px-3 sm:text-xs ${backendStatus === 'connected' ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300' : backendStatus === 'connecting' ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300' : 'border-gray-200 bg-gray-50 text-gray-600 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-400'}`} aria-live="polite">
+                <span className={`h-2 w-2 rounded-full ${backendStatus === 'connected' ? 'bg-emerald-500' : backendStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-gray-400'}`}></span>
+                {backendStatus === 'connected' ? 'Connected' : backendStatus === 'connecting' ? 'Connecting...' : 'Offline — retrying'}
+              </div>
               {isAuthenticated && <button onClick={logout} className="text-sm font-semibold text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-400">Logout</button>}
               <ThemeToggle />
             </div>
@@ -70,7 +76,9 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContent />
+        <BackendStatusProvider>
+          <AppContent />
+        </BackendStatusProvider>
       </AuthProvider>
     </ThemeProvider>
   )
